@@ -1,85 +1,47 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+
+const navItems = [
+  { label: '식단', to: '/diet' },
+  { label: '운동', to: '/workouts' },
+  { label: '진행 현황', to: '/progress' },
+  { label: '커뮤니티', to: '/community' },
+  { label: 'AI 상담', to: '/ai-chat' },
+]
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+  <div class="app-shell">
+    <header class="site-header">
+      <RouterLink class="brand" to="/" aria-label="HealthFit home">
+        <span class="brand-mark">HF</span>
+        <span>
+          <strong>HealthFit</strong>
+          <small>AI 맞춤 건강 관리</small>
+        </span>
+      </RouterLink>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
+      <nav class="main-nav" aria-label="Main navigation">
+        <RouterLink v-for="item in navItems" :key="item.to" :to="item.to">
+          {{ item.label }}
+        </RouterLink>
       </nav>
-    </div>
-  </header>
 
-  <RouterView />
+      <div class="auth-actions">
+        <template v-if="authStore.isAuthenticated">
+          <RouterLink class="text-link" to="/profile">{{ authStore.user?.username || '내 프로필' }}</RouterLink>
+          <button class="primary-link nav-button" type="button" @click="authStore.logout">로그아웃</button>
+        </template>
+        <template v-else>
+          <RouterLink class="text-link" to="/login">로그인</RouterLink>
+          <RouterLink class="primary-link" to="/signup">회원가입</RouterLink>
+        </template>
+      </div>
+    </header>
+
+    <RouterView />
+  </div>
 </template>
-
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
-
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
-}
-</style>

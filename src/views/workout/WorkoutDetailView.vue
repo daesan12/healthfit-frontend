@@ -1,32 +1,76 @@
 <script setup>
-import { computed } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { mockWorkouts } from '@/data/mockData'
+import StateBlock from '@/components/common/StateBlock.vue'
+import { normalizeCaughtError } from '@/api/client'
+import { getWorkout } from '@/api/workout'
 
 const route = useRoute()
-const workout = computed(() => mockWorkouts.find((item) => item.id === Number(route.params.id)))
+const workout = ref(null)
+const isLoading = ref(false)
+const errorMessage = ref('')
+
+async function fetchWorkout() {
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    workout.value = await getWorkout(route.params.id)
+  } catch (error) {
+    const apiError = normalizeCaughtError(error)
+    workout.value = null
+    errorMessage.value = apiError.message
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(fetchWorkout)
 </script>
 
 <template>
   <main class="page-shell">
-    <template v-if="workout">
+    <StateBlock
+      v-if="isLoading"
+      type="loading"
+      title="운동 정보를 불러오는 중입니다"
+      message="선택한 운동의 상세 정보를 조회하고 있습니다."
+    />
+
+    <StateBlock
+      v-else-if="errorMessage"
+      type="error"
+      title="운동 정보를 찾을 수 없습니다"
+      :message="errorMessage"
+    />
+
+    <template v-else-if="workout">
       <PageHeader
         eyebrow="Workout Detail"
         :title="workout.name"
-        description="운동 부위, 장비, 자극 근육, 수행 방법을 확인합니다."
+        description="운동 부위, 장비, 타깃 근육, 수행 방법을 확인합니다."
       />
 
       <section class="content-grid">
         <article class="surface-card" style="grid-column: span 5">
           <p class="section-label">운동 정보</p>
+          <img
+            v-if="workout.gifUrl"
+            class="detail-media"
+            :src="workout.gifUrl"
+            :alt="`${workout.name} 동작 예시`"
+          />
           <div class="chip-list">
             <span v-for="part in workout.bodyParts" :key="part" class="chip">{{ part }}</span>
             <span v-for="equipment in workout.equipments" :key="equipment" class="chip">
               {{ equipment }}
             </span>
           </div>
-          <p class="card-description">주 자극 근육: {{ workout.targetMuscles.join(', ') }}</p>
+          <p class="card-description">주 타깃 근육: {{ workout.targetMuscles.join(', ') }}</p>
+          <p v-if="workout.secondaryMuscles.length" class="card-description">
+            보조 근육: {{ workout.secondaryMuscles.join(', ') }}
+          </p>
         </article>
 
         <article class="surface-card" style="grid-column: span 7">

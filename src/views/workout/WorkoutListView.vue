@@ -1,34 +1,88 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
-import { mockWorkouts } from '@/data/mockData'
+import { normalizeCaughtError } from '@/api/client'
+import { getWorkouts } from '@/api/workout'
 
+const workouts = ref([])
+const bodyParts = ref(['전체'])
+const equipments = ref(['전체'])
 const search = ref('')
 const selectedPart = ref('전체')
 const selectedEquipment = ref('전체')
+const isLoading = ref(false)
+const errorMessage = ref('')
 
-const bodyParts = computed(() => [
-  '전체',
-  ...new Set(mockWorkouts.flatMap((workout) => workout.bodyParts)),
-])
+const resultSummary = computed(() => {
+  if (isLoading.value) return '조회 중'
+  return `${workouts.value.length.toLocaleString()}개 운동`
+})
 
-const equipments = computed(() => [
-  '전체',
-  ...new Set(mockWorkouts.flatMap((workout) => workout.equipments)),
-])
+function buildParams() {
+  const params = {}
+  const keyword = search.value.trim()
 
-const filteredWorkouts = computed(() =>
-  mockWorkouts.filter((workout) => {
-    const matchesSearch = workout.name.includes(search.value.trim())
-    const matchesPart =
-      selectedPart.value === '전체' || workout.bodyParts.includes(selectedPart.value)
-    const matchesEquipment =
-      selectedEquipment.value === '전체' || workout.equipments.includes(selectedEquipment.value)
+  if (keyword) {
+    params.search = keyword
+  }
 
-    return matchesSearch && matchesPart && matchesEquipment
-  }),
-)
+  if (selectedPart.value !== '전체') {
+    params.body_part = selectedPart.value
+  }
+
+  if (selectedEquipment.value !== '전체') {
+    params.equipment = selectedEquipment.value
+  }
+
+  return params
+}
+
+function syncFilters(nextWorkouts) {
+  bodyParts.value = [
+    '전체',
+    ...new Set(nextWorkouts.flatMap((workout) => workout.bodyParts || []).filter(Boolean)),
+  ]
+  equipments.value = [
+    '전체',
+    ...new Set(nextWorkouts.flatMap((workout) => workout.equipments || []).filter(Boolean)),
+  ]
+}
+
+async function fetchWorkouts(options = {}) {
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    const data = await getWorkouts(options.params || {})
+    workouts.value = Array.isArray(data) ? data : []
+
+    if (options.syncFilters) {
+      syncFilters(workouts.value)
+    }
+  } catch (error) {
+    const apiError = normalizeCaughtError(error)
+    workouts.value = []
+    errorMessage.value = apiError.message
+  } finally {
+    isLoading.value = false
+  }
+}
+
+function handleSearch() {
+  fetchWorkouts({ params: buildParams() })
+}
+
+function resetFilters() {
+  search.value = ''
+  selectedPart.value = '전체'
+  selectedEquipment.value = '전체'
+  fetchWorkouts({ syncFilters: true })
+}
+
+onMounted(() => {
+  fetchWorkouts({ syncFilters: true })
+})
 </script>
 
 <template>
@@ -36,35 +90,60 @@ const filteredWorkouts = computed(() =>
     <PageHeader
       eyebrow="Workout"
       title="운동 목록"
-      description="운동 데이터 415개를 검색하고 부위, 장비, 자극 근육을 확인합니다."
+      description="운동명, 부위, 장비 조건으로 운동 데이터를 검색합니다."
     />
 
-    <section class="surface-card filter-panel">
+    <form class="surface-card filter-panel" @submit.prevent="handleSearch">
       <div class="field-group">
         <label for="workout-search">운동명 검색</label>
-        <input id="workout-search" v-model="search" type="text" placeholder="푸시업" />
+        <input id="workout-search" v-model="search" type="text" placeholder="push up, squat, plank" />
       </div>
 
       <div class="field-group">
         <label for="body-part">운동 부위</label>
         <select id="body-part" v-model="selectedPart">
-          <option v-for="part in bodyParts" :key="part">{{ part }}</option>
+          <option v-for="part in bodyParts" :key="part" :value="part">{{ part }}</option>
         </select>
       </div>
 
       <div class="field-group">
         <label for="equipment">장비</label>
         <select id="equipment" v-model="selectedEquipment">
-          <option v-for="equipment in equipments" :key="equipment">{{ equipment }}</option>
+          <option v-for="equipment in equipments" :key="equipment" :value="equipment">
+            {{ equipment }}
+          </option>
         </select>
       </div>
 
-      <RouterLink class="btn btn-primary" to="/workout/recommend">AI 루틴 추천</RouterLink>
-    </section>
+      <button class="btn btn-primary" type="submit" :disabled="isLoading">
+        {{ isLoading ? '검색 중...' : '검색' }}
+      </button>
+      <button class="btn btn-secondary" type="button" :disabled="isLoading" @click="resetFilters">초기화</button>
+      <RouterLink class="btn btn-secondary" to="/workout/recommend">AI 루틴 추천</RouterLink>
+    </form>
 
-    <section class="content-grid">
+    <div class="section-toolbar">
+      <p class="section-label">검색 결과</p>
+      <strong>{{ resultSummary }}</strong>
+    </div>
+
+    <StateBlock
+      v-if="isLoading"
+      type="loading"
+      title="운동 데이터를 불러오는 중입니다"
+      message="백엔드의 운동 fixture 데이터를 조회하고 있습니다."
+    />
+
+    <StateBlock
+      v-else-if="errorMessage"
+      type="error"
+      title="운동 데이터를 불러오지 못했습니다"
+      :message="errorMessage"
+    />
+
+    <section v-else class="content-grid">
       <article
-        v-for="workout in filteredWorkouts"
+        v-for="workout in workouts"
         :key="workout.id"
         class="surface-card"
         style="grid-column: span 4"
@@ -75,10 +154,12 @@ const filteredWorkouts = computed(() =>
           <span v-for="part in workout.bodyParts" :key="part" class="chip">{{ part }}</span>
         </div>
         <p class="card-description">
-          주 자극 근육: {{ workout.targetMuscles.join(', ') }}
+          주 타깃 근육: {{ workout.targetMuscles.join(', ') }}
         </p>
         <ol class="instruction-list">
-          <li v-for="instruction in workout.instructions" :key="instruction">{{ instruction }}</li>
+          <li v-for="instruction in workout.instructions.slice(0, 2)" :key="instruction">
+            {{ instruction }}
+          </li>
         </ol>
         <RouterLink class="btn btn-secondary card-action" :to="`/workouts/${workout.id}`">
           상세 보기
@@ -86,10 +167,10 @@ const filteredWorkouts = computed(() =>
       </article>
 
       <StateBlock
-        v-if="filteredWorkouts.length === 0"
+        v-if="workouts.length === 0"
         style="grid-column: 1 / -1"
         type="empty"
-        title="검색 결과가 없습니다."
+        title="검색 결과가 없습니다"
         message="운동명, 부위, 장비 조건을 바꿔보세요."
       />
     </section>

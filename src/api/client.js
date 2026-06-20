@@ -38,6 +38,24 @@ export function normalizeApiError(errorPayload) {
   }
 }
 
+export function normalizeCaughtError(error) {
+  if (error?.response?.data) {
+    return normalizeApiError(error.response.data)
+  }
+
+  if (error?.message) {
+    return {
+      message: error.message,
+      errors: {},
+    }
+  }
+
+  return {
+    message: '알 수 없는 오류가 발생했습니다.',
+    errors: {},
+  }
+}
+
 export function mapFieldErrors(errors = {}) {
   return Object.fromEntries(
     Object.entries(errors).map(([field, messages]) => [

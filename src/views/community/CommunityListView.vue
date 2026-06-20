@@ -1,37 +1,104 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import StateBlock from '@/components/common/StateBlock.vue'
+import { normalizeCaughtError } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
 import { useCommunityStore } from '@/stores/community'
 
+const authStore = useAuthStore()
 const communityStore = useCommunityStore()
+
+const filters = reactive({
+  search: '',
+  category: '전체',
+})
+
 const draftPost = reactive({
   title: '',
   category: 'diet',
   content: '',
 })
+
 const formMessage = ref('')
+const listErrorMessage = ref('')
 
 const posts = computed(() => communityStore.posts)
+const categoryOptions = [
+  { label: '전체', value: '전체' },
+  { label: '식단', value: 'diet' },
+  { label: '운동', value: 'workout' },
+  { label: '자유', value: 'free' },
+]
 
-function createDraftPost() {
+const resultSummary = computed(() => {
+  if (communityStore.isLoading) return '조회 중'
+  return `${communityStore.postCount.toLocaleString()}개 게시글`
+})
+
+function buildParams() {
+  const params = {}
+  const keyword = filters.search.trim()
+
+  if (keyword) {
+    params.search = keyword
+  }
+
+  if (filters.category !== '전체') {
+    params.category = filters.category
+  }
+
+  return params
+}
+
+async function fetchPosts() {
+  listErrorMessage.value = ''
+
+  try {
+    await communityStore.fetchPosts(buildParams())
+  } catch (error) {
+    const apiError = normalizeCaughtError(error)
+    listErrorMessage.value = apiError.message
+  }
+}
+
+function resetFilters() {
+  filters.search = ''
+  filters.category = '전체'
+  fetchPosts()
+}
+
+async function createDraftPost() {
   formMessage.value = ''
+
+  if (!authStore.isAuthenticated) {
+    formMessage.value = '로그인 후 게시글을 작성할 수 있습니다.'
+    return
+  }
 
   if (!draftPost.title.trim() || !draftPost.content.trim()) {
     formMessage.value = '제목과 내용을 입력해주세요.'
     return
   }
 
-  communityStore.addPost({
-    title: draftPost.title.trim(),
-    category: draftPost.category,
-    preview: draftPost.content.trim(),
-  })
+  try {
+    await communityStore.addPost({
+      title: draftPost.title.trim(),
+      category: draftPost.category,
+      content: draftPost.content.trim(),
+    })
 
-  draftPost.title = ''
-  draftPost.category = 'diet'
-  draftPost.content = ''
-  formMessage.value = '게시글을 임시 작성했습니다. 백엔드 연결 후 posts API로 저장합니다.'
+    draftPost.title = ''
+    draftPost.category = 'diet'
+    draftPost.content = ''
+    formMessage.value = '게시글이 작성되었습니다.'
+  } catch (error) {
+    const apiError = normalizeCaughtError(error)
+    formMessage.value = apiError.message
+  }
 }
+
+onMounted(fetchPosts)
 </script>
 
 <template>
@@ -65,33 +132,77 @@ function createDraftPost() {
 
         <p v-if="formMessage" class="form-message">{{ formMessage }}</p>
 
-        <button class="btn btn-primary" type="submit">게시글 작성</button>
+        <button class="btn btn-primary" type="submit" :disabled="communityStore.isLoading">
+          {{ communityStore.isLoading ? '처리 중...' : '게시글 작성' }}
+        </button>
       </form>
 
       <section class="post-list" style="grid-column: span 8">
-        <article v-for="post in posts" :key="post.id" class="surface-card">
-          <div class="section-heading-row">
-            <div>
-              <span class="chip">{{ post.category }}</span>
-              <h2>{{ post.title }}</h2>
-            </div>
-            <button
-              class="btn"
-              :class="post.isLiked ? 'btn-primary' : 'btn-secondary'"
-              type="button"
-              @click="communityStore.toggleLike(post.id)"
-            >
-              {{ post.isLiked ? '좋아요 취소' : '좋아요' }}
-            </button>
+        <form class="surface-card filter-panel" @submit.prevent="fetchPosts">
+          <div class="field-group">
+            <label for="community-search">게시글 검색</label>
+            <input id="community-search" v-model="filters.search" type="text" placeholder="제목 또는 내용 검색" />
           </div>
-          <p class="card-description">{{ post.preview }}</p>
-          <p class="meta-text">
-            {{ post.author }} · 좋아요 {{ post.likes }} · 댓글 {{ post.comments }}
-          </p>
-          <RouterLink class="btn btn-secondary card-action" :to="`/posts/${post.id}`">
-            상세 보기
-          </RouterLink>
-        </article>
+
+          <div class="field-group">
+            <label for="community-category">카테고리</label>
+            <select id="community-category" v-model="filters.category">
+              <option v-for="category in categoryOptions" :key="category.value" :value="category.value">
+                {{ category.label }}
+              </option>
+            </select>
+          </div>
+
+          <button class="btn btn-primary" type="submit" :disabled="communityStore.isLoading">검색</button>
+          <button class="btn btn-secondary" type="button" :disabled="communityStore.isLoading" @click="resetFilters">
+            초기화
+          </button>
+        </form>
+
+        <div class="section-toolbar">
+          <p class="section-label">게시글 목록</p>
+          <strong>{{ resultSummary }}</strong>
+        </div>
+
+        <StateBlock
+          v-if="communityStore.isLoading && posts.length === 0"
+          type="loading"
+          title="게시글을 불러오는 중입니다"
+          message="커뮤니티 게시글 목록을 조회하고 있습니다."
+        />
+
+        <StateBlock
+          v-else-if="listErrorMessage"
+          type="error"
+          title="게시글을 불러오지 못했습니다"
+          :message="listErrorMessage"
+        />
+
+        <template v-else>
+          <article v-for="post in posts" :key="post.id" class="surface-card">
+            <div class="section-heading-row">
+              <div>
+                <span class="chip">{{ post.category }}</span>
+                <h2>{{ post.title }}</h2>
+              </div>
+              <span class="chip">{{ post.author }}</span>
+            </div>
+            <p class="card-description">{{ post.preview }}</p>
+            <p class="meta-text">
+              {{ post.author }} · 좋아요 {{ post.likes }} · 댓글 {{ post.comments }}
+            </p>
+            <RouterLink class="btn btn-secondary card-action" :to="`/posts/${post.id}`">
+              상세 보기
+            </RouterLink>
+          </article>
+
+          <StateBlock
+            v-if="posts.length === 0"
+            type="empty"
+            title="게시글이 없습니다"
+            message="검색 조건을 바꾸거나 첫 게시글을 작성해보세요."
+          />
+        </template>
       </section>
     </section>
   </main>

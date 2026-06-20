@@ -1,6 +1,12 @@
 <script setup>
 import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import PageHeader from '@/components/common/PageHeader.vue'
+import { mapFieldErrors, normalizeCaughtError } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const router = useRouter()
 
 const form = reactive({
   username: '',
@@ -26,12 +32,34 @@ function validateSignup() {
   return !errors.username && !errors.email && !errors.password
 }
 
-function handleSignup() {
+function applyServerErrors(serverErrors) {
+  const fieldErrors = mapFieldErrors(serverErrors)
+  errors.username = fieldErrors.username || ''
+  errors.email = fieldErrors.email || ''
+  errors.password = fieldErrors.password || fieldErrors.non_field_errors || ''
+}
+
+async function handleSignup() {
   formMessage.value = ''
 
   if (!validateSignup()) return
 
-  formMessage.value = '입력값 검증이 완료되었습니다. 백엔드 연결 후 회원가입 요청을 보냅니다.'
+  try {
+    await authStore.signup({
+      username: form.username.trim(),
+      email: form.email.trim(),
+      password: form.password,
+    })
+
+    formMessage.value = '회원가입이 완료되었습니다. 로그인 화면으로 이동합니다.'
+    setTimeout(() => {
+      router.push('/login')
+    }, 700)
+  } catch (error) {
+    const apiError = normalizeCaughtError(error)
+    applyServerErrors(apiError.errors)
+    formMessage.value = apiError.message
+  }
 }
 </script>
 
@@ -65,7 +93,9 @@ function handleSignup() {
       <p v-if="formMessage" class="form-message">{{ formMessage }}</p>
 
       <div class="button-row">
-        <button class="btn btn-primary" type="submit">계정 만들기</button>
+        <button class="btn btn-primary" type="submit" :disabled="authStore.isLoading">
+          {{ authStore.isLoading ? '가입 중...' : '계정 만들기' }}
+        </button>
         <RouterLink class="btn btn-secondary" to="/login">로그인으로 이동</RouterLink>
       </div>
     </form>

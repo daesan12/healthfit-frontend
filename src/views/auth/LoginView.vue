@@ -2,6 +2,7 @@
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/common/PageHeader.vue'
+import { mapFieldErrors, normalizeCaughtError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -19,7 +20,7 @@ const errors = reactive({
 })
 
 const formMessage = ref('')
-const redirectNotice = route.query.redirect ? '이 기능은 로그인 후 사용할 수 있습니다.' : ''
+const redirectNotice = route.query.redirect ? '로그인이 필요한 기능입니다.' : ''
 
 function validateLogin() {
   errors.loginId = form.loginId.trim() ? '' : '아이디 또는 이메일을 입력해주세요.'
@@ -28,14 +29,29 @@ function validateLogin() {
   return !errors.loginId && !errors.password
 }
 
-function handleLogin() {
+function applyServerErrors(serverErrors) {
+  const fieldErrors = mapFieldErrors(serverErrors)
+  errors.loginId = fieldErrors.login_id || fieldErrors.non_field_errors || ''
+  errors.password = fieldErrors.password || ''
+}
+
+async function handleLogin() {
   formMessage.value = ''
 
   if (!validateLogin()) return
 
-  authStore.mockLogin()
-  formMessage.value = '입력값 검증이 완료되었습니다. 백엔드 연결 후 로그인 요청을 보냅니다.'
-  router.push(route.query.redirect?.toString() || '/profile')
+  try {
+    await authStore.login({
+      loginId: form.loginId.trim(),
+      password: form.password,
+    })
+
+    router.push(route.query.redirect?.toString() || '/profile')
+  } catch (error) {
+    const apiError = normalizeCaughtError(error)
+    applyServerErrors(apiError.errors)
+    formMessage.value = apiError.message
+  }
 }
 </script>
 
@@ -66,17 +82,19 @@ function handleLogin() {
         <p v-if="formMessage" class="form-message">{{ formMessage }}</p>
 
         <div class="button-row">
-          <button class="btn btn-primary" type="submit">로그인</button>
+          <button class="btn btn-primary" type="submit" :disabled="authStore.isLoading">
+            {{ authStore.isLoading ? '로그인 중...' : '로그인' }}
+          </button>
           <RouterLink class="btn btn-secondary" to="/signup">회원가입</RouterLink>
         </div>
       </form>
 
       <aside class="surface-card" style="grid-column: span 7">
-        <p class="section-label">Next Step</p>
-        <h2>백엔드 연동 전까지는 화면 흐름을 먼저 완성합니다.</h2>
+        <p class="section-label">Backend Ready</p>
+        <h2>이제 실제 로그인 API와 연결됩니다.</h2>
         <p>
-          나중에 로그인 API가 준비되면 이 폼에서 `/api/v1/auth/login/`으로 요청을 보내고
-          access token을 저장하게 됩니다.
+          입력값은 `/api/v1/auth/login/`으로 전송되고, 성공하면 access token과 refresh token을 저장합니다.
+          이후 인증이 필요한 화면은 저장된 token을 사용합니다.
         </p>
       </aside>
     </section>

@@ -102,16 +102,16 @@ const router = createRouter({
 router.beforeEach((to) => {
   const requiresAuth = to.matched.some((route) => route.meta.requiresAuth)
   const guestOnly = to.matched.some((route) => route.meta.guestOnly)
-  const hasToken = Boolean(localStorage.getItem('healthfit_access_token'))
+  const hasAccessToken = Boolean(localStorage.getItem('healthfit_access_token'))
 
-  if (requiresAuth && !hasToken) {
+  if (requiresAuth && !hasAccessToken) {
     return {
       name: 'login',
       query: { redirect: to.fullPath },
     }
   }
 
-  if (guestOnly && hasToken) {
+  if (guestOnly && hasAccessToken) {
     return { name: 'profile' }
   }
 

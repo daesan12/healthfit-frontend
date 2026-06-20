@@ -25,6 +25,11 @@ export async function createMeal(payload) {
   return mapMeal(unwrapResponse(response))
 }
 
+export async function deleteMeal(mealId) {
+  const response = await apiClient.delete(`/meals/${mealId}/`)
+  return unwrapResponse(response)
+}
+
 export async function getMealDashboard(params) {
   const response = await apiClient.get('/meals/dashboard/', { params })
   return mapMealDashboard(unwrapResponse(response))

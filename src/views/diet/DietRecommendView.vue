@@ -4,16 +4,21 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import { mockDietRecommendation } from '@/data/mockData'
 import { useSavedItemsStore } from '@/stores/savedItems'
 
-const targetDate = ref('2026-06-19')
+const targetDate = ref(new Date().toISOString().slice(0, 10))
 const mealCount = ref(4)
 const preference = ref('고단백, 조리 간단한 식단')
 const recommendation = ref(mockDietRecommendation)
 const savedItemsStore = useSavedItemsStore()
 const saveMessage = ref('')
+const requestMessage = ref('')
+
+function requestRecommendation() {
+  requestMessage.value = 'AI 서버 연동 전까지는 예시 추천 식단을 표시합니다.'
+}
 
 function saveRecommendation() {
   savedItemsStore.saveMeal(recommendation.value)
-  saveMessage.value = '추천 식단을 임시 저장했습니다. 백엔드 연결 후 saved-meals API로 저장합니다.'
+  saveMessage.value = '추천 식단을 임시 저장했습니다. 저장 식단 API 연동 시 실제 저장으로 전환됩니다.'
 }
 </script>
 
@@ -26,7 +31,7 @@ function saveRecommendation() {
     />
 
     <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4">
+      <form class="form-card" style="grid-column: span 4" @submit.prevent="requestRecommendation">
         <div class="field-group">
           <label for="target-date">추천 기준 날짜</label>
           <input id="target-date" v-model="targetDate" type="date" />
@@ -45,7 +50,8 @@ function saveRecommendation() {
           <textarea id="preference" v-model="preference" />
         </div>
 
-        <button class="btn btn-primary" type="button">추천 요청</button>
+        <button class="btn btn-primary" type="submit">추천 요청</button>
+        <p v-if="requestMessage" class="form-message">{{ requestMessage }}</p>
       </form>
 
       <section class="surface-card recommendation-panel" style="grid-column: span 8">
@@ -60,7 +66,6 @@ function saveRecommendation() {
         </div>
 
         <p v-if="saveMessage" class="form-message">{{ saveMessage }}</p>
-
         <p class="card-description">{{ recommendation.reason }}</p>
 
         <div class="totals-panel recommendation-totals">

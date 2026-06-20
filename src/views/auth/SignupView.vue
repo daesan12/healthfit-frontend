@@ -68,7 +68,7 @@ async function handleSignup() {
     <PageHeader
       eyebrow="Auth"
       title="회원가입"
-      description="AI 식단과 운동 추천에 사용할 개인 계정을 만듭니다."
+      description="HealthFit에서 식단, 운동, 신체 변화를 한 계정으로 관리합니다."
     />
 
     <form class="form-card" style="max-width: 620px" @submit.prevent="handleSignup">

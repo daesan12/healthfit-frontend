@@ -113,6 +113,33 @@ export function mapProfile(apiProfile) {
   }
 }
 
+export function mapBodyRecord(apiRecord) {
+  return {
+    id: apiRecord.id,
+    recordDate: apiRecord.record_date,
+    weight: apiRecord.weight,
+    bodyFatPercentage: apiRecord.body_fat_percentage,
+    skeletalMuscleMass: apiRecord.skeletal_muscle_mass,
+    bmi: apiRecord.bmi,
+    createdAt: apiRecord.created_at,
+  }
+}
+
+export function mapWorkoutLog(apiLog) {
+  return {
+    id: apiLog.id,
+    exerciseId: apiLog.exercise_id,
+    exercise: apiLog.exercise ? mapWorkout(apiLog.exercise) : null,
+    routineId: apiLog.routine_id,
+    workoutDate: apiLog.workout_date,
+    workoutTime: apiLog.workout_time,
+    setCount: apiLog.set_count,
+    repetition: apiLog.repetition,
+    memo: apiLog.memo,
+    createdAt: apiLog.created_at,
+  }
+}
+
 export function mapPost(apiPost) {
   return {
     id: apiPost.id,

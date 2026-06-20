@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
-import { createMeal, getFoods, getMeals } from '@/api/diet'
+import { createMeal, deleteMeal, getFoods, getMeals } from '@/api/diet'
 
 const mealTypes = [
   { label: '아침', value: 'breakfast' },
@@ -25,6 +25,7 @@ const mealItems = ref([])
 const meals = ref([])
 const isLoading = ref(false)
 const isSaving = ref(false)
+const deletingMealId = ref(null)
 const formMessage = ref('')
 const errorMessage = ref('')
 
@@ -146,6 +147,22 @@ async function saveMeal() {
   }
 }
 
+async function removeSavedMeal(mealId) {
+  deletingMealId.value = mealId
+  formMessage.value = ''
+
+  try {
+    await deleteMeal(mealId)
+    formMessage.value = '식단 기록이 삭제되었습니다.'
+    await fetchMeals()
+  } catch (error) {
+    const apiError = normalizeCaughtError(error)
+    formMessage.value = apiError.message
+  } finally {
+    deletingMealId.value = null
+  }
+}
+
 async function handleDateChange() {
   await fetchMeals()
 }
@@ -161,7 +178,7 @@ onMounted(async () => {
     <PageHeader
       eyebrow="Diet"
       title="식단 기록"
-      description="음식 영양성분은 100g 기준이며, 섭취량 g 단위로 계산합니다."
+      description="음식 영양성분은 100g 기준이며, 섭취량에 맞춰 자동 계산됩니다."
     />
 
     <StateBlock
@@ -199,7 +216,7 @@ onMounted(async () => {
         <div class="field-group">
           <label for="food-search">음식 검색</label>
           <div class="button-row">
-            <input id="food-search" v-model="foodSearch" type="text" placeholder="닭가슴살, 현미밥" />
+            <input id="food-search" v-model="foodSearch" type="text" placeholder="닭가슴살, 현미밥, 바나나" />
             <button class="btn btn-secondary" type="button" :disabled="isLoading" @click="fetchFoods">검색</button>
           </div>
         </div>
@@ -304,6 +321,9 @@ onMounted(async () => {
             </div>
             <div>
               <strong>{{ formatNumber(meal.totalCalories) }} kcal</strong>
+              <button type="button" :disabled="deletingMealId === meal.id" @click="removeSavedMeal(meal.id)">
+                {{ deletingMealId === meal.id ? '삭제 중...' : '삭제' }}
+              </button>
             </div>
           </article>
         </div>

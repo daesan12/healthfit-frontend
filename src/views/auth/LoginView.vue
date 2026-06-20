@@ -90,11 +90,11 @@ async function handleLogin() {
       </form>
 
       <aside class="surface-card" style="grid-column: span 7">
-        <p class="section-label">Backend Ready</p>
-        <h2>이제 실제 로그인 API와 연결됩니다.</h2>
+        <p class="section-label">Account</p>
+        <h2>로그인하면 개인 기록이 저장됩니다</h2>
         <p>
-          입력값은 `/api/v1/auth/login/`으로 전송되고, 성공하면 access token과 refresh token을 저장합니다.
-          이후 인증이 필요한 화면은 저장된 token을 사용합니다.
+          로그인 후 식단, 운동, 신체 기록을 저장하고 진행 현황 페이지에서 기간별 변화를 확인할 수 있습니다.
+          인증이 필요한 화면에 접근하면 로그인 후 원래 보려던 화면으로 돌아갑니다.
         </p>
       </aside>
     </section>

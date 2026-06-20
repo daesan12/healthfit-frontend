@@ -41,6 +41,13 @@ const activityLabels = {
   high: '높음',
 }
 
+const goalLabels = {
+  fat_loss: '감량',
+  muscle_gain: '근력 향상',
+  maintenance: '유지',
+  weight_gain: '증량',
+}
+
 function fillProfile(nextProfile) {
   if (!nextProfile) return
 
@@ -110,7 +117,7 @@ onMounted(async () => {
   <main class="page-shell">
     <PageHeader
       eyebrow="Profile"
-      title="마이프로필"
+      title="마이 프로필"
       description="권장 칼로리, 식단 추천, 운동 추천의 기준이 되는 정보를 입력합니다."
     />
 
@@ -118,13 +125,13 @@ onMounted(async () => {
       v-if="profileStore.isLoading && !profileStore.hasProfile"
       type="loading"
       title="프로필을 불러오는 중입니다"
-      message="저장된 정보가 있으면 자동으로 폼에 채워집니다."
+      message="저장된 정보가 있으면 자동으로 입력됩니다."
     />
 
     <section v-else class="content-grid">
       <form class="form-card" style="grid-column: span 8" @submit.prevent="handleProfileSave">
         <p v-if="loadMessage && !profileStore.hasProfile" class="form-message">
-          저장된 프로필이 없으면 새로 입력하면 됩니다.
+          저장된 프로필이 없습니다. 새로 입력하면 추천 기능에 사용할 수 있습니다.
         </p>
 
         <div class="content-grid">
@@ -143,13 +150,13 @@ onMounted(async () => {
           </div>
 
           <div class="field-group" style="grid-column: span 4" :class="{ 'has-error': errors.height }">
-            <label for="height">키</label>
+            <label for="height">키(cm)</label>
             <input id="height" v-model.number="profile.height" type="number" placeholder="181" />
             <p v-if="errors.height" class="error-text">{{ errors.height }}</p>
           </div>
 
           <div class="field-group" style="grid-column: span 4" :class="{ 'has-error': errors.weight }">
-            <label for="weight">몸무게</label>
+            <label for="weight">몸무게(kg)</label>
             <input id="weight" v-model.number="profile.weight" type="number" placeholder="72" />
             <p v-if="errors.weight" class="error-text">{{ errors.weight }}</p>
           </div>
@@ -208,7 +215,8 @@ onMounted(async () => {
         <p class="section-label">추천 기준</p>
         <h2>{{ bodyTypeLabels[profile.bodyType] }}</h2>
         <p>
-          활동량 {{ activityLabels[profile.activityLevel] }} 기준으로 권장 칼로리와 식단, 운동 추천을 계산합니다.
+          활동량 {{ activityLabels[profile.activityLevel] }}, 목표 {{ goalLabels[profile.workoutGoal] }} 기준으로
+          권장 칼로리와 추천 흐름을 계산합니다.
         </p>
         <div class="chip-list">
           <span class="chip">권장 칼로리</span>

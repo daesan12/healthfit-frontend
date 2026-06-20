@@ -94,7 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await authApi.logout(savedRefreshToken)
     } catch {
-      // 클라이언트에서는 이미 로그아웃 처리했으므로 서버 실패는 조용히 넘깁니다.
+      // Client state is already cleared, so a server-side logout failure is non-blocking.
     }
   }
 

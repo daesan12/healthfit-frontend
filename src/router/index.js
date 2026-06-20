@@ -26,6 +26,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/body-records',
+    name: 'body-records',
+    component: () => import('../views/health/BodyRecordsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/diet',
     name: 'diet-dashboard',
     component: () => import('../views/diet/DietDashboardView.vue'),
@@ -68,6 +74,12 @@ const routes = [
     path: '/workout/recommend',
     name: 'workout-recommend',
     component: () => import('../views/workout/WorkoutRecommendView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/workout/logs',
+    name: 'workout-logs',
+    component: () => import('../views/workout/WorkoutLogsView.vue'),
     meta: { requiresAuth: true },
   },
   {

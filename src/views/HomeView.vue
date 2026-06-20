@@ -1,7 +1,7 @@
 <script setup>
 const highlights = [
   { value: '2,322', label: '정제 음식 데이터' },
-  { value: '415', label: '한글화 운동 데이터' },
+  { value: '415', label: '운동 데이터' },
   { value: '25', label: '핵심 요구사항' },
 ]
 
@@ -13,12 +13,12 @@ const featureCards = [
   },
   {
     title: '운동 루틴 관리',
-    text: '운동 목표와 경험에 맞는 루틴을 만들고 실제 수행 기록을 남깁니다.',
+    text: '운동 목표와 경험에 맞는 루틴을 만들고 실제 수행 기록을 남길 수 있습니다.',
     to: '/workout/recommend',
   },
   {
     title: '진행 현황 시각화',
-    text: '체중, 섭취 칼로리, 식단 점수, 운동 횟수 변화를 한눈에 확인합니다.',
+    text: '체중, 섭취 칼로리, 운동 시간을 기간별로 확인합니다.',
     to: '/progress',
   },
 ]
@@ -31,8 +31,8 @@ const featureCards = [
         <p class="section-label">AI 맞춤 식단·운동 추천 서비스</p>
         <h1>오늘의 기록이 내일의 루틴이 되는 HealthFit</h1>
         <p class="hero-description">
-          신체 정보, 식단 기록, 운동 기록을 바탕으로 개인에게 맞는 식단과 운동 루틴을
-          추천하고 진행 현황을 시각화하는 건강 관리 플랫폼입니다.
+          신체 정보, 식단 기록, 운동 기록을 바탕으로 개인에게 맞는 건강 관리 흐름을 만들고
+          진행 현황을 한눈에 확인하는 플랫폼입니다.
         </p>
 
         <div class="hero-actions">

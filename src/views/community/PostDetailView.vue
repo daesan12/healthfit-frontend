@@ -20,6 +20,16 @@ const deletingCommentId = ref(null)
 const post = computed(() => communityStore.currentPost)
 const comments = computed(() => post.value?.commentItems || [])
 
+const categoryLabels = {
+  diet: '식단',
+  workout: '운동',
+  free: '자유',
+}
+
+function categoryLabel(value) {
+  return categoryLabels[value] || value
+}
+
 async function fetchPost() {
   errorMessage.value = ''
 
@@ -123,12 +133,12 @@ onMounted(fetchPost)
       <PageHeader
         eyebrow="Post Detail"
         :title="post.title"
-        :description="`${post.author}님의 ${post.category} 게시글입니다.`"
+        :description="`${post.author}님의 ${categoryLabel(post.category)} 게시글입니다.`"
       />
 
       <section class="content-grid">
         <article class="surface-card" style="grid-column: span 8">
-          <span class="chip">{{ post.category }}</span>
+          <span class="chip">{{ categoryLabel(post.category) }}</span>
           <p class="post-body">{{ post.content }}</p>
           <p class="meta-text">좋아요 {{ post.likes }} · 댓글 {{ comments.length }}</p>
         </article>
@@ -147,6 +157,9 @@ onMounted(fetchPost)
             </button>
             <RouterLink class="btn btn-secondary" to="/community">목록</RouterLink>
           </div>
+          <p v-if="!authStore.isAuthenticated" class="meta-text">
+            로그인하면 좋아요와 댓글을 남길 수 있습니다.
+          </p>
         </aside>
 
         <section class="surface-card comments-panel" style="grid-column: span 8">
@@ -181,7 +194,7 @@ onMounted(fetchPost)
             v-if="comments.length === 0"
             type="empty"
             title="댓글이 없습니다"
-            message="첫 댓글을 남겨 대화를 시작해보세요."
+            message="첫 댓글로 대화를 시작해보세요."
           />
         </section>
       </section>

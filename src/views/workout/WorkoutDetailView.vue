@@ -67,10 +67,16 @@ onMounted(fetchWorkout)
               {{ equipment }}
             </span>
           </div>
-          <p class="card-description">주 타깃 근육: {{ workout.targetMuscles.join(', ') }}</p>
+          <p class="card-description">주요 타깃 근육: {{ workout.targetMuscles.join(', ') || '정보 없음' }}</p>
           <p v-if="workout.secondaryMuscles.length" class="card-description">
             보조 근육: {{ workout.secondaryMuscles.join(', ') }}
           </p>
+          <div class="button-row">
+            <RouterLink class="btn btn-primary" :to="`/workout/logs?exerciseId=${workout.id}`">
+              이 운동 기록하기
+            </RouterLink>
+            <RouterLink class="btn btn-secondary" to="/workouts">목록으로</RouterLink>
+          </div>
         </article>
 
         <article class="surface-card" style="grid-column: span 7">

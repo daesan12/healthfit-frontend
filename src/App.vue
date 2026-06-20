@@ -11,6 +11,7 @@ const isCheckingSession = ref(false)
 const navItems = [
   { label: '식단', to: '/diet' },
   { label: '운동', to: '/workouts' },
+  { label: '기록', to: '/body-records' },
   { label: '진행 현황', to: '/progress' },
   { label: '커뮤니티', to: '/community' },
   { label: 'AI 상담', to: '/ai-chat' },

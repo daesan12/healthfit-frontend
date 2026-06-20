@@ -5,12 +5,14 @@ import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
 import { getWorkouts } from '@/api/workout'
 
+const ALL_FILTER = '전체'
+
 const workouts = ref([])
-const bodyParts = ref(['전체'])
-const equipments = ref(['전체'])
+const bodyParts = ref([ALL_FILTER])
+const equipments = ref([ALL_FILTER])
 const search = ref('')
-const selectedPart = ref('전체')
-const selectedEquipment = ref('전체')
+const selectedPart = ref(ALL_FILTER)
+const selectedEquipment = ref(ALL_FILTER)
 const isLoading = ref(false)
 const errorMessage = ref('')
 
@@ -27,11 +29,11 @@ function buildParams() {
     params.search = keyword
   }
 
-  if (selectedPart.value !== '전체') {
+  if (selectedPart.value !== ALL_FILTER) {
     params.body_part = selectedPart.value
   }
 
-  if (selectedEquipment.value !== '전체') {
+  if (selectedEquipment.value !== ALL_FILTER) {
     params.equipment = selectedEquipment.value
   }
 
@@ -40,11 +42,11 @@ function buildParams() {
 
 function syncFilters(nextWorkouts) {
   bodyParts.value = [
-    '전체',
+    ALL_FILTER,
     ...new Set(nextWorkouts.flatMap((workout) => workout.bodyParts || []).filter(Boolean)),
   ]
   equipments.value = [
-    '전체',
+    ALL_FILTER,
     ...new Set(nextWorkouts.flatMap((workout) => workout.equipments || []).filter(Boolean)),
   ]
 }
@@ -75,8 +77,8 @@ function handleSearch() {
 
 function resetFilters() {
   search.value = ''
-  selectedPart.value = '전체'
-  selectedEquipment.value = '전체'
+  selectedPart.value = ALL_FILTER
+  selectedEquipment.value = ALL_FILTER
   fetchWorkouts({ syncFilters: true })
 }
 
@@ -119,6 +121,7 @@ onMounted(() => {
         {{ isLoading ? '검색 중...' : '검색' }}
       </button>
       <button class="btn btn-secondary" type="button" :disabled="isLoading" @click="resetFilters">초기화</button>
+      <RouterLink class="btn btn-secondary" to="/workout/logs">운동 기록</RouterLink>
       <RouterLink class="btn btn-secondary" to="/workout/recommend">AI 루틴 추천</RouterLink>
     </form>
 
@@ -131,7 +134,7 @@ onMounted(() => {
       v-if="isLoading"
       type="loading"
       title="운동 데이터를 불러오는 중입니다"
-      message="백엔드의 운동 fixture 데이터를 조회하고 있습니다."
+      message="백엔드의 운동 데이터를 조회하고 있습니다."
     />
 
     <StateBlock
@@ -148,22 +151,27 @@ onMounted(() => {
         class="surface-card"
         style="grid-column: span 4"
       >
-        <p class="section-label">{{ workout.equipments.join(', ') }}</p>
+        <p class="section-label">{{ workout.equipments.join(', ') || '장비 없음' }}</p>
         <h2>{{ workout.name }}</h2>
         <div class="chip-list">
           <span v-for="part in workout.bodyParts" :key="part" class="chip">{{ part }}</span>
         </div>
         <p class="card-description">
-          주 타깃 근육: {{ workout.targetMuscles.join(', ') }}
+          주요 타깃 근육: {{ workout.targetMuscles.join(', ') || '정보 없음' }}
         </p>
         <ol class="instruction-list">
           <li v-for="instruction in workout.instructions.slice(0, 2)" :key="instruction">
             {{ instruction }}
           </li>
         </ol>
-        <RouterLink class="btn btn-secondary card-action" :to="`/workouts/${workout.id}`">
-          상세 보기
-        </RouterLink>
+        <div class="button-row">
+          <RouterLink class="btn btn-secondary card-action" :to="`/workouts/${workout.id}`">
+            상세 보기
+          </RouterLink>
+          <RouterLink class="btn btn-primary card-action" :to="`/workout/logs?exerciseId=${workout.id}`">
+            기록하기
+          </RouterLink>
+        </div>
       </article>
 
       <StateBlock
@@ -171,7 +179,7 @@ onMounted(() => {
         style="grid-column: 1 / -1"
         type="empty"
         title="검색 결과가 없습니다"
-        message="운동명, 부위, 장비 조건을 바꿔보세요."
+        message="운동명, 부위, 장비 조건을 바꿔 다시 검색해보세요."
       />
     </section>
   </main>

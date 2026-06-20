@@ -5,10 +5,15 @@ import { mockDietFeedback } from '@/data/mockData'
 
 const targetDate = ref(mockDietFeedback.date)
 const feedback = ref(mockDietFeedback)
+const requestMessage = ref('')
 
 const calorieRate = computed(() =>
   Math.min(Math.round((feedback.value.totalCalories / feedback.value.recommendedCalories) * 100), 100),
 )
+
+function requestEvaluation() {
+  requestMessage.value = 'AI 서버 연동 전까지는 예시 평가 결과를 표시합니다.'
+}
 </script>
 
 <template>
@@ -20,14 +25,15 @@ const calorieRate = computed(() =>
     />
 
     <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4">
+      <form class="form-card" style="grid-column: span 4" @submit.prevent="requestEvaluation">
         <div class="field-group">
           <label for="evaluation-date">평가 날짜</label>
           <input id="evaluation-date" v-model="targetDate" type="date" />
         </div>
 
-        <button class="btn btn-primary" type="button">식단 평가 요청</button>
+        <button class="btn btn-primary" type="submit">식단 평가 요청</button>
         <RouterLink class="btn btn-secondary" to="/diet/records">식단 기록 수정</RouterLink>
+        <p v-if="requestMessage" class="form-message">{{ requestMessage }}</p>
       </form>
 
       <section class="surface-card evaluation-panel" style="grid-column: span 8">

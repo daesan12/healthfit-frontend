@@ -47,6 +47,25 @@ const macroRows = computed(() => [
   },
 ])
 
+const mealTypeRows = computed(() => {
+  const summary = dashboard.value?.mealTypeSummary || {}
+  return [
+    { label: '아침', value: 'breakfast' },
+    { label: '점심', value: 'lunch' },
+    { label: '저녁', value: 'dinner' },
+    { label: '간식', value: 'snack' },
+  ].map((type) => ({
+    ...type,
+    ...(summary[type.value] || {
+      meal_count: 0,
+      total_calories: 0,
+      total_carbohydrate: 0,
+      total_protein: 0,
+      total_fat: 0,
+    }),
+  }))
+})
+
 function formatNumber(value, digits = 1) {
   return Number(value || 0).toFixed(digits)
 }
@@ -78,7 +97,7 @@ onMounted(fetchDashboard)
     <PageHeader
       eyebrow="Diet"
       title="식단 대시보드"
-      description="권장 칼로리와 오늘의 섭취 상태를 한눈에 확인합니다."
+      description="권장 칼로리와 선택한 날짜의 섭취 상태를 한눈에 확인합니다."
     />
 
     <section class="surface-card filter-panel">
@@ -89,6 +108,8 @@ onMounted(fetchDashboard)
       <button class="btn btn-primary" type="button" :disabled="isLoading" @click="fetchDashboard">
         {{ isLoading ? '조회 중...' : '조회' }}
       </button>
+      <RouterLink class="btn btn-secondary" to="/diet/records">식단 기록</RouterLink>
+      <RouterLink class="btn btn-secondary" to="/foods">음식 검색</RouterLink>
     </section>
 
     <StateBlock
@@ -117,7 +138,13 @@ onMounted(fetchDashboard)
       </article>
 
       <section class="surface-card" style="grid-column: span 8">
-        <p class="section-label">오늘의 탄단지</p>
+        <div class="section-heading-row">
+          <div>
+            <p class="section-label">Macros</p>
+            <h2>오늘의 탄단지</h2>
+          </div>
+          <RouterLink class="text-link" to="/diet/records">기록 추가</RouterLink>
+        </div>
         <div v-for="row in macroRows" :key="row.label" class="macro-row">
           <span>{{ row.label }}</span>
           <div class="meter"><i :style="{ width: `${macroPercent(row)}%` }"></i></div>
@@ -134,6 +161,28 @@ onMounted(fetchDashboard)
           <RouterLink class="btn btn-secondary" to="/diet/evaluation">오늘 평가</RouterLink>
         </div>
       </aside>
+
+      <section class="surface-card" style="grid-column: 1 / -1">
+        <div class="section-heading-row">
+          <div>
+            <p class="section-label">Meal Type</p>
+            <h2>식사 유형별 요약</h2>
+          </div>
+          <span class="chip">{{ selectedDate }}</span>
+        </div>
+        <div class="meal-list">
+          <article v-for="row in mealTypeRows" :key="row.value" class="meal-item">
+            <div>
+              <strong>{{ row.label }}</strong>
+              <span>{{ row.meal_count }}개 기록</span>
+            </div>
+            <div>
+              <strong>{{ formatNumber(row.total_calories, 0) }} kcal</strong>
+              <span>단백질 {{ formatNumber(row.total_protein) }}g</span>
+            </div>
+          </article>
+        </div>
+      </section>
     </section>
   </main>
 </template>

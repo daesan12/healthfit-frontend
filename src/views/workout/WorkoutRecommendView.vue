@@ -6,14 +6,19 @@ import { useSavedItemsStore } from '@/stores/savedItems'
 
 const availableTime = ref(mockWorkoutRecommendation.availableTime)
 const weeklyFrequency = ref(mockWorkoutRecommendation.weeklyFrequency)
-const preference = ref('초보자용, 무릎 부담 적은 운동')
+const preference = ref('초보자용, 무릎 부담이 적은 운동')
 const recommendation = ref(mockWorkoutRecommendation)
 const savedItemsStore = useSavedItemsStore()
 const saveMessage = ref('')
+const requestMessage = ref('')
+
+function requestRecommendation() {
+  requestMessage.value = 'AI 서버 연동 전까지는 예시 운동 루틴을 표시합니다.'
+}
 
 function saveRoutine() {
   savedItemsStore.saveRoutine(recommendation.value)
-  saveMessage.value = '운동 루틴을 임시 저장했습니다. 백엔드 연결 후 workout-routines API로 저장합니다.'
+  saveMessage.value = '운동 루틴을 임시 저장했습니다. 루틴 저장 API 연동 시 실제 저장으로 전환됩니다.'
 }
 </script>
 
@@ -26,7 +31,7 @@ function saveRoutine() {
     />
 
     <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4">
+      <form class="form-card" style="grid-column: span 4" @submit.prevent="requestRecommendation">
         <div class="field-group">
           <label for="available-time">운동 가능 시간</label>
           <input id="available-time" v-model.number="availableTime" type="number" min="10" />
@@ -47,7 +52,8 @@ function saveRoutine() {
           <textarea id="workout-preference" v-model="preference" />
         </div>
 
-        <button class="btn btn-primary" type="button">운동 추천 요청</button>
+        <button class="btn btn-primary" type="submit">운동 추천 요청</button>
+        <p v-if="requestMessage" class="form-message">{{ requestMessage }}</p>
       </form>
 
       <section class="surface-card routine-panel" style="grid-column: span 8">
@@ -60,7 +66,6 @@ function saveRoutine() {
         </div>
 
         <p v-if="saveMessage" class="form-message">{{ saveMessage }}</p>
-
         <p class="card-description">{{ recommendation.reason }}</p>
 
         <div class="routine-list">

@@ -5,16 +5,18 @@ import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
 import { getFoods } from '@/api/diet'
 
+const ALL_CATEGORY = '전체'
+
 const foods = ref([])
-const categories = ref(['전체'])
+const categories = ref([ALL_CATEGORY])
 const search = ref('')
-const selectedCategory = ref('전체')
+const selectedCategory = ref(ALL_CATEGORY)
 const isLoading = ref(false)
 const errorMessage = ref('')
 
 const resultSummary = computed(() => {
   if (isLoading.value) return '조회 중'
-  return `${foods.value.length.toLocaleString()}개 식품`
+  return `${foods.value.length.toLocaleString()}개 음식`
 })
 
 function buildParams() {
@@ -25,7 +27,7 @@ function buildParams() {
     params.search = keyword
   }
 
-  if (selectedCategory.value !== '전체') {
+  if (selectedCategory.value !== ALL_CATEGORY) {
     params.category = selectedCategory.value
   }
 
@@ -34,7 +36,7 @@ function buildParams() {
 
 function syncCategories(nextFoods) {
   const nextCategories = [...new Set(nextFoods.map((food) => food.category).filter(Boolean))]
-  categories.value = ['전체', ...nextCategories]
+  categories.value = [ALL_CATEGORY, ...nextCategories]
 }
 
 async function fetchFoods(options = {}) {
@@ -63,7 +65,7 @@ function handleSearch() {
 
 function resetFilters() {
   search.value = ''
-  selectedCategory.value = '전체'
+  selectedCategory.value = ALL_CATEGORY
   fetchFoods({ syncCategories: true })
 }
 
@@ -109,7 +111,7 @@ onMounted(() => {
       v-if="isLoading"
       type="loading"
       title="음식 데이터를 불러오는 중입니다"
-      message="백엔드의 식품 fixture 데이터를 조회하고 있습니다."
+      message="백엔드의 음식 데이터를 조회하고 있습니다."
     />
 
     <StateBlock

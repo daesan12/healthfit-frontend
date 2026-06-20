@@ -6,12 +6,14 @@ import { normalizeCaughtError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { useCommunityStore } from '@/stores/community'
 
+const ALL_CATEGORY = '전체'
+
 const authStore = useAuthStore()
 const communityStore = useCommunityStore()
 
 const filters = reactive({
   search: '',
-  category: '전체',
+  category: ALL_CATEGORY,
 })
 
 const draftPost = reactive({
@@ -25,7 +27,7 @@ const listErrorMessage = ref('')
 
 const posts = computed(() => communityStore.posts)
 const categoryOptions = [
-  { label: '전체', value: '전체' },
+  { label: ALL_CATEGORY, value: ALL_CATEGORY },
   { label: '식단', value: 'diet' },
   { label: '운동', value: 'workout' },
   { label: '자유', value: 'free' },
@@ -36,6 +38,10 @@ const resultSummary = computed(() => {
   return `${communityStore.postCount.toLocaleString()}개 게시글`
 })
 
+function categoryLabel(value) {
+  return categoryOptions.find((category) => category.value === value)?.label || value
+}
+
 function buildParams() {
   const params = {}
   const keyword = filters.search.trim()
@@ -44,7 +50,7 @@ function buildParams() {
     params.search = keyword
   }
 
-  if (filters.category !== '전체') {
+  if (filters.category !== ALL_CATEGORY) {
     params.category = filters.category
   }
 
@@ -64,7 +70,7 @@ async function fetchPosts() {
 
 function resetFilters() {
   filters.search = ''
-  filters.category = '전체'
+  filters.category = ALL_CATEGORY
   fetchPosts()
 }
 
@@ -106,7 +112,7 @@ onMounted(fetchPosts)
     <PageHeader
       eyebrow="Community"
       title="커뮤니티"
-      description="식단, 운동 루틴, 운동 기록을 게시글로 공유합니다."
+      description="식단, 운동 루틴, 기록 경험을 게시글로 공유합니다."
     />
 
     <section class="content-grid">
@@ -182,7 +188,7 @@ onMounted(fetchPosts)
           <article v-for="post in posts" :key="post.id" class="surface-card">
             <div class="section-heading-row">
               <div>
-                <span class="chip">{{ post.category }}</span>
+                <span class="chip">{{ categoryLabel(post.category) }}</span>
                 <h2>{{ post.title }}</h2>
               </div>
               <span class="chip">{{ post.author }}</span>

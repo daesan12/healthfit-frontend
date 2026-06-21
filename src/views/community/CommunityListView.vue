@@ -1,8 +1,10 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
+import { getSavedMealsPage } from '@/api/diet'
+import { getWorkoutRoutinesPage } from '@/api/workout'
 import { useAuthStore } from '@/stores/auth'
 import { useCommunityStore } from '@/stores/community'
 import { useToastStore } from '@/stores/toast'
@@ -22,12 +24,19 @@ const draftPost = reactive({
   title: '',
   category: 'diet',
   content: '',
+  shareType: 'none',
+  sharedSavedMealId: '',
+  sharedWorkoutRoutineId: '',
 })
 
+const savedMealOptions = ref([])
+const routineOptions = ref([])
+const isShareOptionsLoading = ref(false)
 const formMessage = ref('')
 const listErrorMessage = ref('')
 
 const posts = computed(() => communityStore.posts)
+const pagination = computed(() => communityStore.pagination)
 const categoryOptions = [
   { label: ALL_CATEGORY, value: ALL_CATEGORY },
   { label: '식단', value: 'diet' },
@@ -44,17 +53,18 @@ function categoryLabel(value) {
   return categoryOptions.find((category) => category.value === value)?.label || value
 }
 
+function sharedLabel(post) {
+  if (post.sharedType === 'saved_meal') return `공유 식단 · ${post.sharedSavedMeal?.name || '저장 식단'}`
+  if (post.sharedType === 'workout_routine') return `공유 루틴 · ${post.sharedWorkoutRoutine?.name || '운동 루틴'}`
+  return ''
+}
+
 function buildParams() {
-  const params = {}
+  const params = { page: pagination.value.page || 1 }
   const keyword = filters.search.trim()
 
-  if (keyword) {
-    params.search = keyword
-  }
-
-  if (filters.category !== ALL_CATEGORY) {
-    params.category = filters.category
-  }
+  if (keyword) params.search = keyword
+  if (filters.category !== ALL_CATEGORY) params.category = filters.category
 
   return params
 }
@@ -65,15 +75,53 @@ async function fetchPosts() {
   try {
     await communityStore.fetchPosts(buildParams())
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
-    listErrorMessage.value = apiError.message
+    listErrorMessage.value = normalizeCaughtError(error).message
   }
+}
+
+async function fetchShareOptions() {
+  if (!authStore.isAuthenticated) return
+  isShareOptionsLoading.value = true
+
+  try {
+    const [savedMeals, routines] = await Promise.all([
+      getSavedMealsPage({ page_size: 100 }),
+      getWorkoutRoutinesPage({ page_size: 100 }),
+    ])
+    savedMealOptions.value = savedMeals.results
+    routineOptions.value = routines.results
+  } catch (error) {
+    formMessage.value = normalizeCaughtError(error).message
+  } finally {
+    isShareOptionsLoading.value = false
+  }
+}
+
+function searchPosts() {
+  communityStore.pagination.page = 1
+  fetchPosts()
+}
+
+function movePage(page) {
+  if (page < 1 || page === pagination.value.page) return
+  communityStore.pagination.page = page
+  fetchPosts()
 }
 
 function resetFilters() {
   filters.search = ''
   filters.category = ALL_CATEGORY
+  communityStore.pagination.page = 1
   fetchPosts()
+}
+
+function resetDraft() {
+  draftPost.title = ''
+  draftPost.category = 'diet'
+  draftPost.content = ''
+  draftPost.shareType = 'none'
+  draftPost.sharedSavedMealId = ''
+  draftPost.sharedWorkoutRoutineId = ''
 }
 
 async function createDraftPost() {
@@ -89,25 +137,49 @@ async function createDraftPost() {
     return
   }
 
+  if (draftPost.shareType === 'saved_meal' && !draftPost.sharedSavedMealId) {
+    formMessage.value = '공유할 저장 식단을 선택해주세요.'
+    return
+  }
+
+  if (draftPost.shareType === 'workout_routine' && !draftPost.sharedWorkoutRoutineId) {
+    formMessage.value = '공유할 운동 루틴을 선택해주세요.'
+    return
+  }
+
   try {
     await communityStore.addPost({
       title: draftPost.title.trim(),
       category: draftPost.category,
       content: draftPost.content.trim(),
+      sharedSavedMealId: draftPost.shareType === 'saved_meal' ? Number(draftPost.sharedSavedMealId) : null,
+      sharedWorkoutRoutineId:
+        draftPost.shareType === 'workout_routine' ? Number(draftPost.sharedWorkoutRoutineId) : null,
     })
 
-    draftPost.title = ''
-    draftPost.category = 'diet'
-    draftPost.content = ''
-    formMessage.value = '게시글이 작성되었습니다.'
-    toastStore.success('게시글 작성 완료', '커뮤니티 목록에 새 게시글이 추가되었습니다.')
+    resetDraft()
+    formMessage.value = '게시글을 작성했습니다.'
+    toastStore.success('게시글 작성 완료', '커뮤니티 목록에 게시글을 추가했습니다.')
+    await fetchPosts()
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
-    formMessage.value = apiError.message
+    formMessage.value = normalizeCaughtError(error).message
   }
 }
 
-onMounted(fetchPosts)
+watch(
+  () => draftPost.shareType,
+  (shareType) => {
+    draftPost.sharedSavedMealId = ''
+    draftPost.sharedWorkoutRoutineId = ''
+    if (shareType === 'saved_meal') draftPost.category = 'diet'
+    if (shareType === 'workout_routine') draftPost.category = 'workout'
+  },
+)
+
+onMounted(() => {
+  fetchPosts()
+  fetchShareOptions()
+})
 </script>
 
 <template>
@@ -135,8 +207,37 @@ onMounted(fetchPosts)
         </div>
 
         <div class="field-group">
+          <label for="post-share-type">공유 항목</label>
+          <select id="post-share-type" v-model="draftPost.shareType" :disabled="isShareOptionsLoading">
+            <option value="none">없음</option>
+            <option value="saved_meal">저장 식단</option>
+            <option value="workout_routine">운동 루틴</option>
+          </select>
+        </div>
+
+        <div v-if="draftPost.shareType === 'saved_meal'" class="field-group">
+          <label for="shared-saved-meal">저장 식단 선택</label>
+          <select id="shared-saved-meal" v-model="draftPost.sharedSavedMealId">
+            <option value="">선택</option>
+            <option v-for="meal in savedMealOptions" :key="meal.id" :value="meal.id">
+              {{ meal.name }} · {{ meal.totalCalories }} kcal
+            </option>
+          </select>
+        </div>
+
+        <div v-if="draftPost.shareType === 'workout_routine'" class="field-group">
+          <label for="shared-routine">운동 루틴 선택</label>
+          <select id="shared-routine" v-model="draftPost.sharedWorkoutRoutineId">
+            <option value="">선택</option>
+            <option v-for="routine in routineOptions" :key="routine.id" :value="routine.id">
+              {{ routine.name }} · {{ routine.items.length }}개 운동
+            </option>
+          </select>
+        </div>
+
+        <div class="field-group">
           <label for="post-content">내용</label>
-          <textarea id="post-content" v-model="draftPost.content" placeholder="공유할 내용을 입력하세요." />
+          <textarea id="post-content" v-model="draftPost.content" placeholder="공유할 내용을 입력하세요" />
         </div>
 
         <p v-if="formMessage" class="form-message">{{ formMessage }}</p>
@@ -147,7 +248,7 @@ onMounted(fetchPosts)
       </form>
 
       <section class="post-list" style="grid-column: span 8">
-        <form class="surface-card filter-panel" @submit.prevent="fetchPosts">
+        <form class="surface-card filter-panel" @submit.prevent="searchPosts">
           <div class="field-group">
             <label for="community-search">게시글 검색</label>
             <input id="community-search" v-model="filters.search" type="text" placeholder="제목 또는 내용 검색" />
@@ -192,18 +293,40 @@ onMounted(fetchPosts)
             <div class="section-heading-row">
               <div>
                 <span class="chip">{{ categoryLabel(post.category) }}</span>
+                <span v-if="post.sharedType" class="chip">{{ sharedLabel(post) }}</span>
                 <h2>{{ post.title }}</h2>
               </div>
-              <span class="chip">{{ post.author }}</span>
+              <RouterLink v-if="post.authorId" class="chip" :to="`/users/${post.authorId}`">{{ post.author }}</RouterLink>
+              <span v-else class="chip">{{ post.author }}</span>
             </div>
             <p class="card-description">{{ post.preview }}</p>
             <p class="meta-text">
-              {{ post.author }} · 좋아요 {{ post.likes }} · 댓글 {{ post.comments }}
+              작성자 {{ post.author }} · 좋아요 {{ post.likes }} · 댓글 {{ post.comments }}
             </p>
             <RouterLink class="btn btn-secondary card-action" :to="`/posts/${post.id}`">
               상세 보기
             </RouterLink>
           </article>
+
+          <div v-if="posts.length > 0" class="surface-card pagination-panel" style="grid-column: 1 / -1">
+            <button
+              class="btn btn-secondary"
+              type="button"
+              :disabled="!pagination.hasPrevious || communityStore.isLoading"
+              @click="movePage(pagination.page - 1)"
+            >
+              이전
+            </button>
+            <strong>{{ pagination.page }} / {{ pagination.totalPages }}</strong>
+            <button
+              class="btn btn-secondary"
+              type="button"
+              :disabled="!pagination.hasNext || communityStore.isLoading"
+              @click="movePage(pagination.page + 1)"
+            >
+              다음
+            </button>
+          </div>
 
           <StateBlock
             v-if="posts.length === 0"

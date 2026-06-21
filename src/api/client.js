@@ -31,6 +31,24 @@ export function unwrapResponse(response) {
   return payload?.data ?? payload
 }
 
+export function mapPaginatedData(data, mapper = (item) => item) {
+  const results = Array.isArray(data) ? data : data?.results || []
+  const count = data?.count ?? results.length
+  const pageSize = data?.page_size ?? results.length
+
+  return {
+    count,
+    page: data?.page ?? 1,
+    pageSize,
+    totalPages: data?.total_pages ?? (pageSize ? Math.max(1, Math.ceil(count / pageSize)) : 1),
+    next: data?.next ?? null,
+    previous: data?.previous ?? null,
+    hasNext: Boolean(data?.has_next ?? data?.next),
+    hasPrevious: Boolean(data?.has_previous ?? data?.previous),
+    results: results.map(mapper),
+  }
+}
+
 export function normalizeApiError(errorPayload) {
   return {
     message: errorPayload?.message || '요청 처리에 실패했습니다.',

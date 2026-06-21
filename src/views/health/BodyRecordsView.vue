@@ -1,9 +1,9 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
-import { createBodyRecord, deleteBodyRecord, getBodyRecords } from '@/api/health'
+import { createBodyRecord, deleteBodyRecord, getBodyRecordsPage } from '@/api/health'
 import { useToastStore } from '@/stores/toast'
 
 const today = new Date().toISOString().slice(0, 10)
@@ -23,21 +23,44 @@ const deletingId = ref(null)
 const pendingDeleteId = ref(null)
 const formMessage = ref('')
 const errorMessage = ref('')
+const pagination = reactive({
+  count: 0,
+  page: 1,
+  pageSize: 20,
+  totalPages: 1,
+  hasNext: false,
+  hasPrevious: false,
+})
+
+const resultSummary = computed(() => {
+  if (isLoading.value) return '조회 중'
+  return `${pagination.count.toLocaleString()}개 기록 · ${pagination.page}/${pagination.totalPages} 페이지`
+})
+
+function syncPagination(data) {
+  pagination.count = data.count
+  pagination.page = data.page
+  pagination.pageSize = data.pageSize
+  pagination.totalPages = data.totalPages
+  pagination.hasNext = data.hasNext
+  pagination.hasPrevious = data.hasPrevious
+}
 
 function formatValue(value, unit) {
   if (value === null || value === undefined || value === '') return '미입력'
   return `${Number(value).toFixed(1)}${unit}`
 }
 
-async function fetchRecords() {
+async function fetchRecords(page = 1) {
   isLoading.value = true
   errorMessage.value = ''
 
   try {
-    records.value = await getBodyRecords()
+    const data = await getBodyRecordsPage({ page, page_size: pagination.pageSize })
+    records.value = data.results
+    syncPagination(data)
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
-    errorMessage.value = apiError.message
+    errorMessage.value = normalizeCaughtError(error).message
   } finally {
     isLoading.value = false
   }
@@ -66,10 +89,9 @@ async function saveRecord() {
     pendingDeleteId.value = null
     formMessage.value = '신체 기록이 저장되었습니다.'
     toastStore.success('신체 기록 저장 완료', '진행 현황에서 변화를 확인할 수 있습니다.')
-    await fetchRecords()
+    await fetchRecords(1)
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
-    formMessage.value = apiError.message
+    formMessage.value = normalizeCaughtError(error).message
   } finally {
     isSaving.value = false
   }
@@ -88,12 +110,11 @@ async function removeRecord(recordId) {
 
   try {
     await deleteBodyRecord(recordId)
-    records.value = records.value.filter((record) => record.id !== recordId)
     pendingDeleteId.value = null
-    formMessage.value = '신체 기록이 삭제되었습니다.'
+    formMessage.value = '신체 기록을 삭제했습니다.'
+    await fetchRecords(pagination.page)
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
-    formMessage.value = apiError.message
+    formMessage.value = normalizeCaughtError(error).message
   } finally {
     deletingId.value = null
   }
@@ -104,7 +125,7 @@ function cancelDelete() {
   formMessage.value = ''
 }
 
-onMounted(fetchRecords)
+onMounted(() => fetchRecords(1))
 </script>
 
 <template>
@@ -112,7 +133,7 @@ onMounted(fetchRecords)
     <PageHeader
       eyebrow="Health"
       title="신체 기록"
-      description="체중, 체지방률, 골격근량을 기록해 진행 현황에 반영합니다."
+      description="체중, 체지방률, 골격근량 기록을 진행 현황에 반영합니다."
     />
 
     <section class="content-grid">
@@ -149,7 +170,7 @@ onMounted(fetchRecords)
             <p class="section-label">Records</p>
             <h2>최근 신체 기록</h2>
           </div>
-          <span class="chip">{{ records.length }}개</span>
+          <span class="chip">{{ resultSummary }}</span>
         </div>
 
         <StateBlock
@@ -189,6 +210,16 @@ onMounted(fetchRecords)
               <button v-if="pendingDeleteId === record.id" type="button" @click="cancelDelete">취소</button>
             </div>
           </article>
+
+          <div v-if="records.length > 0" class="surface-card pagination-panel">
+            <button class="btn btn-secondary" type="button" :disabled="!pagination.hasPrevious || isLoading" @click="fetchRecords(pagination.page - 1)">
+              이전
+            </button>
+            <strong>{{ pagination.page }} / {{ pagination.totalPages }}</strong>
+            <button class="btn btn-secondary" type="button" :disabled="!pagination.hasNext || isLoading" @click="fetchRecords(pagination.page + 1)">
+              다음
+            </button>
+          </div>
 
           <StateBlock
             v-if="records.length === 0"

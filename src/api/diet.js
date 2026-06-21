@@ -1,16 +1,61 @@
-import { apiClient, unwrapResponse } from './client'
-import { mapDietFeedback, mapDietRecommendation, mapFood, mapMeal, mapMealDashboard } from './adapters'
+import { apiClient, mapPaginatedData, unwrapResponse } from './client'
+import {
+  mapDietFeedback,
+  mapDietRecommendation,
+  mapFood,
+  mapMeal,
+  mapMealDashboard,
+  mapSavedMeal,
+} from './adapters'
 
 export async function getFoods(params) {
   const response = await apiClient.get('/foods/', { params })
   const data = unwrapResponse(response)
-  return Array.isArray(data) ? data.map(mapFood) : data
+  const results = Array.isArray(data) ? data : data.results || []
+  return results.map(mapFood)
+}
+
+export async function getFoodsPage(params) {
+  const response = await apiClient.get('/foods/', { params })
+  return mapPaginatedData(unwrapResponse(response), mapFood)
+}
+
+function toFoodPayload(food) {
+  return {
+    name: food.name,
+    category: food.category,
+    calories: food.calories,
+    carbohydrate: food.carbohydrate,
+    protein: food.protein,
+    fat: food.fat,
+  }
+}
+
+export async function createFood(food) {
+  const response = await apiClient.post('/foods/', toFoodPayload(food))
+  return mapFood(unwrapResponse(response))
+}
+
+export async function updateFood(foodId, food) {
+  const response = await apiClient.patch(`/foods/${foodId}/`, toFoodPayload(food))
+  return mapFood(unwrapResponse(response))
+}
+
+export async function deleteFood(foodId) {
+  const response = await apiClient.delete(`/foods/${foodId}/`)
+  return unwrapResponse(response)
 }
 
 export async function getMeals(params) {
   const response = await apiClient.get('/meals/', { params })
   const data = unwrapResponse(response)
-  return Array.isArray(data) ? data.map(mapMeal) : data
+  const results = Array.isArray(data) ? data : data.results || []
+  return results.map(mapMeal)
+}
+
+export async function getMealsPage(params) {
+  const response = await apiClient.get('/meals/', { params })
+  return mapPaginatedData(unwrapResponse(response), mapMeal)
 }
 
 export async function createMeal(payload) {
@@ -30,6 +75,52 @@ export async function deleteMeal(mealId) {
   return unwrapResponse(response)
 }
 
+export async function getSavedMeals(params) {
+  const response = await apiClient.get('/saved-meals/', { params })
+  const data = unwrapResponse(response)
+  const results = Array.isArray(data) ? data : data.results || []
+  return results.map(mapSavedMeal)
+}
+
+export async function getSavedMealsPage(params) {
+  const response = await apiClient.get('/saved-meals/', { params })
+  return mapPaginatedData(unwrapResponse(response), mapSavedMeal)
+}
+
+function toSavedMealPayload(savedMeal) {
+  return {
+    name: savedMeal.name,
+    description: savedMeal.description,
+    items: (savedMeal.items || []).map((item) => ({
+      food_id: item.foodId,
+      amount: item.amount,
+    })),
+  }
+}
+
+export async function createSavedMeal(savedMeal) {
+  const response = await apiClient.post('/saved-meals/', toSavedMealPayload(savedMeal))
+  return mapSavedMeal(unwrapResponse(response))
+}
+
+export async function updateSavedMeal(savedMealId, savedMeal) {
+  const response = await apiClient.patch(`/saved-meals/${savedMealId}/`, toSavedMealPayload(savedMeal))
+  return mapSavedMeal(unwrapResponse(response))
+}
+
+export async function deleteSavedMeal(savedMealId) {
+  const response = await apiClient.delete(`/saved-meals/${savedMealId}/`)
+  return unwrapResponse(response)
+}
+
+export async function createMealFromSavedMeal(savedMealId, payload) {
+  const response = await apiClient.post(`/saved-meals/${savedMealId}/create-meal/`, {
+    meal_type: payload.mealType,
+    intake_date: payload.intakeDate,
+  })
+  return mapMeal(unwrapResponse(response))
+}
+
 export async function getMealDashboard(params) {
   const response = await apiClient.get('/meals/dashboard/', { params })
   return mapMealDashboard(unwrapResponse(response))
@@ -40,7 +131,42 @@ export async function recommendDiet(payload) {
   return mapDietRecommendation(unwrapResponse(response))
 }
 
+export async function getDietRecommendation(recommendationId) {
+  const response = await apiClient.get(`/ai/diet/recommendations/${recommendationId}/`)
+  return mapDietRecommendation(unwrapResponse(response))
+}
+
 export async function evaluateDiet(payload) {
   const response = await apiClient.post('/ai/diet/evaluations/', payload)
   return mapDietFeedback(unwrapResponse(response))
+}
+
+export async function saveDietRecommendation(recommendationId, payload) {
+  const response = await apiClient.post(`/ai/diet/recommendations/${recommendationId}/save/`, payload)
+  return unwrapResponse(response)
+}
+
+export async function replaceDietRecommendationFood(recommendationId, payload) {
+  const requestBody = {
+    meal_order: payload.mealOrder,
+    message: payload.message,
+  }
+
+  if (payload.replaceFoodId) {
+    requestBody.replace_food_id = payload.replaceFoodId
+  }
+
+  if (payload.replaceAiFoodKey) {
+    requestBody.replace_ai_food_key = payload.replaceAiFoodKey
+  }
+
+  const response = await apiClient.post(`/ai/diet/recommendations/${recommendationId}/replace/`, requestBody)
+  return mapDietRecommendation(unwrapResponse(response))
+}
+
+export async function rerollDietRecommendation(recommendationId, payload) {
+  const response = await apiClient.post(`/ai/diet/recommendations/${recommendationId}/reroll/`, {
+    message: payload.message,
+  })
+  return mapDietRecommendation(unwrapResponse(response))
 }

@@ -1,5 +1,5 @@
 import { mapBodyRecord } from './adapters'
-import { apiClient, unwrapResponse } from './client'
+import { apiClient, mapPaginatedData, unwrapResponse } from './client'
 
 function toBodyRecordPayload(record) {
   return {
@@ -13,7 +13,13 @@ function toBodyRecordPayload(record) {
 export async function getBodyRecords(params) {
   const response = await apiClient.get('/body-records/', { params })
   const data = unwrapResponse(response)
-  return Array.isArray(data) ? data.map(mapBodyRecord) : data
+  const results = Array.isArray(data) ? data : data.results || []
+  return results.map(mapBodyRecord)
+}
+
+export async function getBodyRecordsPage(params) {
+  const response = await apiClient.get('/body-records/', { params })
+  return mapPaginatedData(unwrapResponse(response), mapBodyRecord)
 }
 
 export async function createBodyRecord(record) {

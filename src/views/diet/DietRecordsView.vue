@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
-import { createMeal, deleteMeal, getFoods, getMeals } from '@/api/diet'
+import { createMeal, deleteMeal, getFoods, getMealsPage } from '@/api/diet'
 import { useToastStore } from '@/stores/toast'
 
 const mealTypes = [
@@ -16,6 +16,15 @@ const mealTypes = [
 const form = reactive({
   intakeDate: new Date().toISOString().slice(0, 10),
   mealType: 'breakfast',
+})
+
+const pagination = reactive({
+  page: 1,
+  pageSize: 10,
+  count: 0,
+  totalPages: 1,
+  hasNext: false,
+  hasPrevious: false,
 })
 
 const foodSearch = ref('')
@@ -50,6 +59,22 @@ const totals = computed(() =>
   ),
 )
 
+const resultSummary = computed(() => {
+  if (!pagination.count) return '0개'
+  const start = (pagination.page - 1) * pagination.pageSize + 1
+  const end = Math.min(start + meals.value.length - 1, pagination.count)
+  return `${pagination.count}개 중 ${start}-${end}`
+})
+
+function syncPagination(data) {
+  pagination.page = data.page || 1
+  pagination.pageSize = data.pageSize || pagination.pageSize
+  pagination.count = data.count || 0
+  pagination.totalPages = data.totalPages || 1
+  pagination.hasNext = data.hasNext
+  pagination.hasPrevious = data.hasPrevious
+}
+
 function calculateNutrition(food, grams) {
   if (!food) return { calories: 0, carbohydrate: 0, protein: 0, fat: 0 }
   const ratio = Number(grams || 0) / 100
@@ -74,7 +99,7 @@ async function fetchFoods() {
   errorMessage.value = ''
 
   try {
-    foods.value = await getFoods(foodSearch.value.trim() ? { search: foodSearch.value.trim() } : {})
+    foods.value = await getFoods(foodSearch.value.trim() ? { search: foodSearch.value.trim(), page_size: 50 } : { page_size: 50 })
     if (!selectedFoodId.value && foods.value[0]) selectedFoodId.value = foods.value[0].id
   } catch (error) {
     errorMessage.value = normalizeCaughtError(error).message
@@ -83,9 +108,17 @@ async function fetchFoods() {
   }
 }
 
-async function fetchMeals() {
+async function fetchMeals(page = pagination.page) {
+  errorMessage.value = ''
+
   try {
-    meals.value = await getMeals({ date: form.intakeDate })
+    const data = await getMealsPage({
+      date: form.intakeDate,
+      page,
+      page_size: pagination.pageSize,
+    })
+    meals.value = data.results
+    syncPagination(data)
   } catch (error) {
     errorMessage.value = normalizeCaughtError(error).message
   }
@@ -132,8 +165,8 @@ async function saveMeal() {
     })
     mealItems.value = []
     formMessage.value = '식단 기록이 저장되었습니다.'
-    toastStore.success('식단 저장 완료', '오늘 식단 기록에 반영되었습니다.')
-    await fetchMeals()
+    toastStore.success('식단 저장 완료', '오늘 식단 기록에 반영했습니다.')
+    await fetchMeals(1)
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   } finally {
@@ -154,9 +187,9 @@ async function removeSavedMeal(mealId) {
 
   try {
     await deleteMeal(mealId)
-    formMessage.value = '식단 기록이 삭제되었습니다.'
+    formMessage.value = '식단 기록을 삭제했습니다.'
     pendingDeleteMealId.value = null
-    await fetchMeals()
+    await fetchMeals(meals.value.length === 1 && pagination.page > 1 ? pagination.page - 1 : pagination.page)
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   } finally {
@@ -169,9 +202,14 @@ function cancelDelete() {
   formMessage.value = ''
 }
 
+async function handleDateChange() {
+  pendingDeleteMealId.value = null
+  await fetchMeals(1)
+}
+
 onMounted(async () => {
   await fetchFoods()
-  await fetchMeals()
+  await fetchMeals(1)
 })
 </script>
 
@@ -187,7 +225,7 @@ onMounted(async () => {
       <form class="form-card" style="grid-column: span 5" @submit.prevent="saveMeal">
         <div class="field-group">
           <label for="intake-date">섭취 날짜</label>
-          <input id="intake-date" v-model="form.intakeDate" type="date" @change="fetchMeals" />
+          <input id="intake-date" v-model="form.intakeDate" type="date" @change="handleDateChange" />
         </div>
 
         <div class="field-group">
@@ -202,7 +240,7 @@ onMounted(async () => {
         <div class="field-group">
           <label for="food-search">음식 검색</label>
           <div class="inline-controls">
-            <input id="food-search" v-model="foodSearch" type="text" placeholder="예: 닭가슴살" />
+            <input id="food-search" v-model="foodSearch" type="text" placeholder="닭가슴살, 현미밥" />
             <button class="btn btn-secondary" type="button" :disabled="isLoading" @click="fetchFoods">검색</button>
           </div>
         </div>
@@ -265,6 +303,11 @@ onMounted(async () => {
           {{ isSaving ? '저장 중...' : '식단 기록 저장' }}
         </button>
         <p v-if="formMessage" class="form-message">{{ formMessage }}</p>
+        <div class="button-row">
+          <RouterLink class="btn btn-secondary" to="/diet/evaluation">AI 식단 평가</RouterLink>
+          <RouterLink class="btn btn-secondary" to="/diet/recommend">AI 식단 추천</RouterLink>
+          <RouterLink class="btn btn-secondary" to="/saved-meals">저장 식단 관리</RouterLink>
+        </div>
       </form>
 
       <section class="surface-card" style="grid-column: span 7">
@@ -273,7 +316,7 @@ onMounted(async () => {
             <p class="section-label">Saved Meals</p>
             <h2>{{ form.intakeDate }} 식단</h2>
           </div>
-          <span class="chip">{{ meals.length }}개</span>
+          <span class="chip">{{ resultSummary }}</span>
         </div>
 
         <StateBlock
@@ -287,9 +330,9 @@ onMounted(async () => {
           <article v-for="meal in meals" :key="meal.id" class="meal-item">
             <div>
               <strong>{{ mealTypeLabel(meal.mealType) }}</strong>
-              <span>
-                {{ meal.foodName || meal.name || '식단 기록' }} ·
-                {{ formatNumber(meal.calories) }}kcal
+              <span>{{ formatNumber(meal.totalCalories) }}kcal</span>
+              <span v-for="item in meal.mealItems" :key="item.id">
+                {{ item.foodName }} {{ item.amount }}g
               </span>
             </div>
             <div class="delete-actions">
@@ -312,11 +355,21 @@ onMounted(async () => {
             </div>
           </article>
 
+          <div v-if="pagination.totalPages > 1" class="pagination-panel">
+            <button class="btn btn-secondary" type="button" :disabled="!pagination.hasPrevious" @click="fetchMeals(pagination.page - 1)">
+              이전
+            </button>
+            <span>{{ pagination.page }} / {{ pagination.totalPages }}</span>
+            <button class="btn btn-secondary" type="button" :disabled="!pagination.hasNext" @click="fetchMeals(pagination.page + 1)">
+              다음
+            </button>
+          </div>
+
           <StateBlock
             v-if="meals.length === 0"
             type="empty"
             title="저장된 식단이 없습니다"
-            message="왼쪽 폼에서 음식을 추가하고 식단을 저장해보세요."
+            message="왼쪽에서 음식을 추가하고 식단을 저장해보세요."
           >
             <a class="btn btn-primary" href="#food-search">음식 추가하기</a>
             <RouterLink class="btn btn-secondary" to="/foods">음식 데이터 보기</RouterLink>

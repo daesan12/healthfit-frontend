@@ -1,9 +1,9 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
-import { getWorkouts } from '@/api/workout'
+import { getWorkoutsPage } from '@/api/workout'
 
 const ALL_FILTER = '전체'
 
@@ -15,14 +15,22 @@ const selectedPart = ref(ALL_FILTER)
 const selectedEquipment = ref(ALL_FILTER)
 const isLoading = ref(false)
 const errorMessage = ref('')
+const pagination = reactive({
+  count: 0,
+  page: 1,
+  pageSize: 20,
+  totalPages: 1,
+  hasNext: false,
+  hasPrevious: false,
+})
 
 const resultSummary = computed(() => {
   if (isLoading.value) return '조회 중'
-  return `${workouts.value.length.toLocaleString()}개 운동`
+  return `${pagination.count.toLocaleString()}개 운동 · ${pagination.page}/${pagination.totalPages} 페이지`
 })
 
-function buildParams() {
-  const params = {}
+function buildParams(page = pagination.page) {
+  const params = { page, page_size: pagination.pageSize }
   const keyword = search.value.trim()
 
   if (keyword) params.search = keyword
@@ -40,6 +48,15 @@ function syncFilters(nextWorkouts) {
   ]
 }
 
+function syncPagination(data) {
+  pagination.count = data.count
+  pagination.page = data.page
+  pagination.pageSize = data.pageSize
+  pagination.totalPages = data.totalPages
+  pagination.hasNext = data.hasNext
+  pagination.hasPrevious = data.hasPrevious
+}
+
 function compactList(items, emptyText = '정보 없음', limit = 3) {
   const list = Array.isArray(items) ? items.filter(Boolean) : []
   if (list.length === 0) return emptyText
@@ -52,16 +69,16 @@ async function fetchWorkouts(options = {}) {
   errorMessage.value = ''
 
   try {
-    const data = await getWorkouts(options.params || {})
-    workouts.value = Array.isArray(data) ? data : []
+    const data = await getWorkoutsPage(options.params || buildParams(options.page || 1))
+    workouts.value = data.results
+    syncPagination(data)
 
     if (options.syncFilters) {
       syncFilters(workouts.value)
     }
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
     workouts.value = []
-    errorMessage.value = apiError.message
+    errorMessage.value = normalizeCaughtError(error).message
   } finally {
     isLoading.value = false
   }
@@ -71,15 +88,20 @@ function resetFilters() {
   search.value = ''
   selectedPart.value = ALL_FILTER
   selectedEquipment.value = ALL_FILTER
-  fetchWorkouts({ syncFilters: true })
+  fetchWorkouts({ params: { page: 1, page_size: pagination.pageSize }, syncFilters: true })
 }
 
 function handleSearch() {
-  fetchWorkouts({ params: buildParams() })
+  fetchWorkouts({ params: buildParams(1) })
+}
+
+function movePage(page) {
+  if (page < 1 || page > pagination.totalPages || page === pagination.page) return
+  fetchWorkouts({ params: buildParams(page) })
 }
 
 onMounted(() => {
-  fetchWorkouts({ syncFilters: true })
+  fetchWorkouts({ params: buildParams(1), syncFilters: true })
 })
 </script>
 
@@ -151,11 +173,11 @@ onMounted(() => {
 
         <dl class="dense-info-list">
           <div>
-            <dt>타깃</dt>
+            <dt>주요 근육</dt>
             <dd>{{ compactList(workout.targetMuscles) }}</dd>
           </div>
           <div>
-            <dt>보조</dt>
+            <dt>보조 근육</dt>
             <dd>{{ compactList(workout.secondaryMuscles, '보조 근육 없음') }}</dd>
           </div>
           <div>
@@ -180,6 +202,16 @@ onMounted(() => {
           </RouterLink>
         </div>
       </article>
+
+      <div v-if="workouts.length > 0" class="surface-card pagination-panel" style="grid-column: 1 / -1">
+        <button class="btn btn-secondary" type="button" :disabled="!pagination.hasPrevious || isLoading" @click="movePage(pagination.page - 1)">
+          이전
+        </button>
+        <strong>{{ pagination.page }} / {{ pagination.totalPages }}</strong>
+        <button class="btn btn-secondary" type="button" :disabled="!pagination.hasNext || isLoading" @click="movePage(pagination.page + 1)">
+          다음
+        </button>
+      </div>
 
       <StateBlock
         v-if="workouts.length === 0"

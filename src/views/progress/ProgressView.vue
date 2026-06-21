@@ -20,24 +20,6 @@ const errorMessage = ref('')
 
 const bodyRecords = computed(() => progress.value?.bodySummary.recentRecords || [])
 
-const metrics = computed(() => [
-  {
-    label: '체중 변화',
-    value: formatSigned(progress.value?.bodySummary.weightChange, 'kg'),
-    hint: '기간 첫 기록과 마지막 기록 기준',
-  },
-  {
-    label: '총 섭취 칼로리',
-    value: `${formatNumber(progress.value?.mealSummary.totalCalories, 0)} kcal`,
-    hint: `${progress.value?.mealSummary.mealCount || 0}개 식단 기록`,
-  },
-  {
-    label: '운동 기록',
-    value: `${progress.value?.workoutSummary.workoutCount || 0}회`,
-    hint: `${progress.value?.workoutSummary.totalWorkoutTime || 0}분 운동`,
-  },
-])
-
 const dailyRows = computed(() => {
   const mealDaily = progress.value?.mealSummary.daily || []
   const workoutDaily = progress.value?.workoutSummary.daily || []
@@ -51,13 +33,63 @@ const dailyRows = computed(() => {
       date,
       calories: Number(meal.total_calories || 0),
       protein: Number(meal.total_protein || 0),
-      workoutCount: workout.workout_count || 0,
-      workoutTime: workout.total_workout_time || 0,
+      workoutCount: Number(workout.workout_count || 0),
+      workoutTime: Number(workout.total_workout_time || 0),
     }
   })
 })
 
 const maxCalories = computed(() => Math.max(...dailyRows.value.map((item) => item.calories), 1))
+const maxWorkoutTime = computed(() => Math.max(...dailyRows.value.map((item) => item.workoutTime), 1))
+const activeDays = computed(() => dailyRows.value.filter((item) => item.calories > 0 || item.workoutTime > 0).length)
+const averageCalories = computed(() => {
+  if (!dailyRows.value.length) return 0
+  return dailyRows.value.reduce((sum, item) => sum + item.calories, 0) / dailyRows.value.length
+})
+const topCaloriesDay = computed(() =>
+  dailyRows.value.reduce((top, item) => (item.calories > top.calories ? item : top), { calories: 0, date: '-' }),
+)
+
+const bodyTrendRows = computed(() =>
+  bodyRecords.value
+    .map((record) => ({
+      id: record.id,
+      date: recordDate(record),
+      weight: Number(recordWeight(record) || 0),
+      bodyFat: recordBodyFat(record),
+      muscle: recordMuscle(record),
+    }))
+    .filter((record) => record.weight > 0)
+    .slice()
+    .reverse(),
+)
+
+const bodyTrendMax = computed(() => Math.max(...bodyTrendRows.value.map((item) => item.weight), 1))
+const bodyTrendMin = computed(() => Math.min(...bodyTrendRows.value.map((item) => item.weight), bodyTrendMax.value))
+
+const metrics = computed(() => [
+  {
+    label: '체중 변화',
+    value: formatSigned(progress.value?.bodySummary.weightChange, 'kg'),
+    hint: '기간 첫 기록과 마지막 기록 기준',
+  },
+  {
+    label: '총 섭취 칼로리',
+    value: `${formatNumber(progress.value?.mealSummary.totalCalories, 0)} kcal`,
+    hint: `${progress.value?.mealSummary.mealCount || 0}개 식단 기록`,
+  },
+  {
+    label: '운동 기록',
+    value: `${progress.value?.workoutSummary.workoutCount || 0}개`,
+    hint: `${progress.value?.workoutSummary.totalWorkoutTime || 0}분 운동`,
+  },
+])
+
+const insightItems = computed(() => [
+  { label: '기록된 날', value: `${activeDays.value}일` },
+  { label: '평균 섭취', value: `${formatNumber(averageCalories.value, 0)} kcal` },
+  { label: '최고 섭취일', value: topCaloriesDay.value.date === '-' ? '-' : topCaloriesDay.value.date.slice(5) },
+])
 
 function formatNumber(value, digits = 1) {
   return Number(value || 0).toFixed(digits)
@@ -75,8 +107,34 @@ function formatSigned(value, unit) {
   return `${sign}${formatNumber(number)}${unit}`
 }
 
-function barHeight(value) {
+function recordDate(record) {
+  return record.recordDate || record.record_date || '-'
+}
+
+function recordWeight(record) {
+  return record.weight
+}
+
+function recordBodyFat(record) {
+  return record.bodyFatPercentage ?? record.body_fat_percentage
+}
+
+function recordMuscle(record) {
+  return record.skeletalMuscleMass ?? record.skeletal_muscle_mass
+}
+
+function calorieHeight(value) {
   return `${Math.max(Math.round((Number(value || 0) / maxCalories.value) * 100), 8)}%`
+}
+
+function workoutHeight(value) {
+  return `${Math.max(Math.round((Number(value || 0) / maxWorkoutTime.value) * 100), 8)}%`
+}
+
+function weightPointHeight(value) {
+  const range = Math.max(bodyTrendMax.value - bodyTrendMin.value, 1)
+  const ratio = (Number(value || bodyTrendMin.value) - bodyTrendMin.value) / range
+  return `${Math.max(Math.round(ratio * 100), 8)}%`
 }
 
 async function fetchProgress() {
@@ -138,47 +196,58 @@ onMounted(fetchProgress)
     />
 
     <section v-else-if="progress" class="content-grid">
-      <article
-        v-for="metric in metrics"
-        :key="metric.label"
-        class="metric-card"
-        style="grid-column: span 4"
-      >
+      <article v-for="metric in metrics" :key="metric.label" class="metric-card" style="grid-column: span 4">
         <span>{{ metric.label }}</span>
         <strong>{{ metric.value }}</strong>
         <p>{{ metric.hint }}</p>
       </article>
 
-      <article class="surface-card" style="grid-column: span 8">
+      <article class="surface-card progress-chart-card" style="grid-column: span 8">
         <div class="section-heading-row">
           <div>
-            <p class="section-label">Daily Calories</p>
-            <h2>일별 섭취 칼로리</h2>
+            <p class="section-label">Daily Balance</p>
+            <h2>일별 섭취와 운동</h2>
           </div>
-          <span class="chip">{{ dailyRows.length }}일</span>
+          <div class="chart-legend" aria-label="그래프 범례">
+            <span><i class="legend-calorie"></i>섭취 kcal</span>
+            <span><i class="legend-workout"></i>운동 분</span>
+          </div>
         </div>
-        <div
-          v-if="dailyRows.length"
-          class="bar-chart"
-          :style="{ gridTemplateColumns: `repeat(${dailyRows.length}, 1fr)` }"
-        >
-          <div v-for="item in dailyRows" :key="item.date" class="bar-item">
-            <span>{{ formatNumber(item.calories, 0) }}</span>
-            <i :style="{ height: barHeight(item.calories) }"></i>
+
+        <div v-if="dailyRows.length" class="combo-chart" :style="{ gridTemplateColumns: `repeat(${dailyRows.length}, 1fr)` }">
+          <div v-for="item in dailyRows" :key="item.date" class="combo-chart-item">
+            <div class="combo-values">
+              <span>{{ formatNumber(item.calories, 0) }}</span>
+              <em>{{ item.workoutTime }}분</em>
+            </div>
+            <div class="combo-bars">
+              <i class="calorie-bar" :style="{ height: calorieHeight(item.calories) }"></i>
+              <i class="workout-bar" :style="{ height: workoutHeight(item.workoutTime) }"></i>
+            </div>
             <strong>{{ item.date.slice(5) }}</strong>
           </div>
         </div>
+
         <StateBlock
           v-else
           type="empty"
           title="기간 내 식단 또는 운동 기록이 없습니다"
           message="식단 기록이나 운동 기록을 추가하면 이곳에 일별 요약이 표시됩니다."
-        />
+        >
+          <RouterLink class="btn btn-primary" to="/diet/records">식단 기록하기</RouterLink>
+          <RouterLink class="btn btn-secondary" to="/workout/logs">운동 기록하기</RouterLink>
+        </StateBlock>
       </article>
 
-      <aside class="surface-card" style="grid-column: span 4">
-        <p class="section-label">Body Summary</p>
-        <h2>신체 변화 요약</h2>
+      <aside class="surface-card progress-insights" style="grid-column: span 4">
+        <p class="section-label">Insights</p>
+        <h2>기간 요약</h2>
+        <div class="insight-stat-list">
+          <article v-for="item in insightItems" :key="item.label">
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+          </article>
+        </div>
         <div class="record-row">
           <span>시작 체중</span>
           <strong>{{ formatOptional(progress.bodySummary.startingWeight, 'kg') }}</strong>
@@ -189,43 +258,33 @@ onMounted(fetchProgress)
           <strong>{{ formatOptional(progress.bodySummary.latestWeight, 'kg') }}</strong>
           <em>기간 내 가장 최근 체중 기록</em>
         </div>
-        <div class="record-row">
-          <span>총 운동 시간</span>
-          <strong>{{ progress.workoutSummary.totalWorkoutTime }}분</strong>
-          <em>기간 내 모든 운동 기록의 합계</em>
-        </div>
       </aside>
 
       <section class="surface-card" style="grid-column: span 6">
         <div class="section-heading-row">
           <div>
-            <p class="section-label">Body Records</p>
-            <h2>최근 신체 기록</h2>
+            <p class="section-label">Body Trend</p>
+            <h2>체중 변화 추이</h2>
           </div>
           <RouterLink class="text-link" to="/body-records">관리</RouterLink>
         </div>
 
-        <div v-if="bodyRecords.length" class="meal-list">
-          <article v-for="record in bodyRecords" :key="record.id" class="meal-item">
-            <div>
-              <strong>{{ record.record_date }}</strong>
-              <span>
-                체중 {{ formatOptional(record.weight, 'kg') }} · 체지방
-                {{ formatOptional(record.body_fat_percentage, '%') }}
-              </span>
-            </div>
-            <div>
-              <strong>{{ formatOptional(record.skeletal_muscle_mass, 'kg') }}</strong>
-              <span>골격근량</span>
-            </div>
-          </article>
+        <div v-if="bodyTrendRows.length" class="weight-trend" :style="{ gridTemplateColumns: `repeat(${bodyTrendRows.length}, 1fr)` }">
+          <div v-for="record in bodyTrendRows" :key="record.id" class="weight-trend-item">
+            <span>{{ formatNumber(record.weight) }}kg</span>
+            <i :style="{ height: weightPointHeight(record.weight) }"></i>
+            <strong>{{ record.date.slice(5) }}</strong>
+          </div>
         </div>
+
         <StateBlock
           v-else
           type="empty"
           title="신체 기록이 없습니다"
           message="몸무게, 체지방률, 골격근량을 기록하면 변화 추이를 확인할 수 있습니다."
-        />
+        >
+          <RouterLink class="btn btn-primary" to="/body-records">신체 기록하기</RouterLink>
+        </StateBlock>
       </section>
 
       <section class="surface-card" style="grid-column: span 6">
@@ -244,7 +303,7 @@ onMounted(fetchProgress)
               <span>섭취 {{ formatNumber(item.calories, 0) }} kcal · 단백질 {{ formatNumber(item.protein) }}g</span>
             </div>
             <div>
-              <strong>{{ item.workoutCount }}회</strong>
+              <strong>{{ item.workoutCount }}개</strong>
               <span>{{ item.workoutTime }}분</span>
             </div>
           </article>
@@ -254,7 +313,10 @@ onMounted(fetchProgress)
           type="empty"
           title="일별 요약 데이터가 없습니다"
           message="식단이나 운동 기록을 남기면 날짜별 요약이 표시됩니다."
-        />
+        >
+          <RouterLink class="btn btn-primary" to="/diet/records">식단 기록하기</RouterLink>
+          <RouterLink class="btn btn-secondary" to="/workout/logs">운동 기록하기</RouterLink>
+        </StateBlock>
       </section>
     </section>
   </main>

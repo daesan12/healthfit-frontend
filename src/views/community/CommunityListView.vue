@@ -5,11 +5,13 @@ import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { useCommunityStore } from '@/stores/community'
+import { useToastStore } from '@/stores/toast'
 
 const ALL_CATEGORY = '전체'
 
 const authStore = useAuthStore()
 const communityStore = useCommunityStore()
+const toastStore = useToastStore()
 
 const filters = reactive({
   search: '',
@@ -98,6 +100,7 @@ async function createDraftPost() {
     draftPost.category = 'diet'
     draftPost.content = ''
     formMessage.value = '게시글이 작성되었습니다.'
+    toastStore.success('게시글 작성 완료', '커뮤니티 목록에 새 게시글이 추가되었습니다.')
   } catch (error) {
     const apiError = normalizeCaughtError(error)
     formMessage.value = apiError.message
@@ -207,7 +210,10 @@ onMounted(fetchPosts)
             type="empty"
             title="게시글이 없습니다"
             message="검색 조건을 바꾸거나 첫 게시글을 작성해보세요."
-          />
+          >
+            <button class="btn btn-secondary" type="button" @click="resetFilters">검색 초기화</button>
+            <a class="btn btn-primary" href="#post-title">게시글 작성하기</a>
+          </StateBlock>
         </template>
       </section>
     </section>

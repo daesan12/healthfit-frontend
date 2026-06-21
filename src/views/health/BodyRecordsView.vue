@@ -4,8 +4,10 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
 import { createBodyRecord, deleteBodyRecord, getBodyRecords } from '@/api/health'
+import { useToastStore } from '@/stores/toast'
 
 const today = new Date().toISOString().slice(0, 10)
+const toastStore = useToastStore()
 
 const form = reactive({
   recordDate: today,
@@ -18,11 +20,12 @@ const records = ref([])
 const isLoading = ref(false)
 const isSaving = ref(false)
 const deletingId = ref(null)
+const pendingDeleteId = ref(null)
 const formMessage = ref('')
 const errorMessage = ref('')
 
 function formatValue(value, unit) {
-  if (value === null || value === undefined) return '미입력'
+  if (value === null || value === undefined || value === '') return '미입력'
   return `${Number(value).toFixed(1)}${unit}`
 }
 
@@ -60,7 +63,9 @@ async function saveRecord() {
     form.weight = null
     form.bodyFatPercentage = null
     form.skeletalMuscleMass = null
+    pendingDeleteId.value = null
     formMessage.value = '신체 기록이 저장되었습니다.'
+    toastStore.success('신체 기록 저장 완료', '진행 현황에서 변화를 확인할 수 있습니다.')
     await fetchRecords()
   } catch (error) {
     const apiError = normalizeCaughtError(error)
@@ -71,12 +76,20 @@ async function saveRecord() {
 }
 
 async function removeRecord(recordId) {
-  deletingId.value = recordId
   formMessage.value = ''
+
+  if (pendingDeleteId.value !== recordId) {
+    pendingDeleteId.value = recordId
+    formMessage.value = '삭제하려면 같은 버튼을 한 번 더 눌러주세요.'
+    return
+  }
+
+  deletingId.value = recordId
 
   try {
     await deleteBodyRecord(recordId)
     records.value = records.value.filter((record) => record.id !== recordId)
+    pendingDeleteId.value = null
     formMessage.value = '신체 기록이 삭제되었습니다.'
   } catch (error) {
     const apiError = normalizeCaughtError(error)
@@ -84,6 +97,11 @@ async function removeRecord(recordId) {
   } finally {
     deletingId.value = null
   }
+}
+
+function cancelDelete() {
+  pendingDeleteId.value = null
+  formMessage.value = ''
 }
 
 onMounted(fetchRecords)
@@ -106,17 +124,17 @@ onMounted(fetchRecords)
 
         <div class="field-group">
           <label for="weight">몸무게(kg)</label>
-          <input id="weight" v-model.number="form.weight" type="number" min="0" step="0.1" placeholder="72.4" />
+          <input id="weight" v-model.number="form.weight" type="number" inputmode="decimal" min="0" step="0.1" placeholder="72.4" />
         </div>
 
         <div class="field-group">
           <label for="body-fat">체지방률(%)</label>
-          <input id="body-fat" v-model.number="form.bodyFatPercentage" type="number" min="0" step="0.1" placeholder="18.5" />
+          <input id="body-fat" v-model.number="form.bodyFatPercentage" type="number" inputmode="decimal" min="0" step="0.1" placeholder="18.5" />
         </div>
 
         <div class="field-group">
           <label for="muscle">골격근량(kg)</label>
-          <input id="muscle" v-model.number="form.skeletalMuscleMass" type="number" min="0" step="0.1" placeholder="32.0" />
+          <input id="muscle" v-model.number="form.skeletalMuscleMass" type="number" inputmode="decimal" min="0" step="0.1" placeholder="32.0" />
         </div>
 
         <button class="btn btn-primary" type="submit" :disabled="isSaving">
@@ -153,14 +171,22 @@ onMounted(fetchRecords)
             <div>
               <strong>{{ record.recordDate }}</strong>
               <span>
-                체중 {{ formatValue(record.weight, 'kg') }} · 체지방 {{ formatValue(record.bodyFatPercentage, '%') }}
+                체중 {{ formatValue(record.weight, 'kg') }} · 체지방
+                {{ formatValue(record.bodyFatPercentage, '%') }} · 골격근량
+                {{ formatValue(record.skeletalMuscleMass, 'kg') }}
               </span>
             </div>
-            <div>
+            <div class="delete-actions">
               <strong>BMI {{ record.bmi ?? '-' }}</strong>
-              <button type="button" :disabled="deletingId === record.id" @click="removeRecord(record.id)">
-                {{ deletingId === record.id ? '삭제 중...' : '삭제' }}
+              <button
+                type="button"
+                :class="{ 'is-danger': pendingDeleteId === record.id }"
+                :disabled="deletingId === record.id"
+                @click="removeRecord(record.id)"
+              >
+                {{ deletingId === record.id ? '삭제 중...' : pendingDeleteId === record.id ? '확인 삭제' : '삭제' }}
               </button>
+              <button v-if="pendingDeleteId === record.id" type="button" @click="cancelDelete">취소</button>
             </div>
           </article>
 
@@ -168,8 +194,11 @@ onMounted(fetchRecords)
             v-if="records.length === 0"
             type="empty"
             title="저장된 신체 기록이 없습니다"
-            message="왼쪽 폼에서 오늘의 기록을 남겨보세요."
-          />
+            message="왼쪽 폼에서 오늘의 신체 정보를 기록해보세요."
+          >
+            <a class="btn btn-primary" href="#weight">신체 정보 입력하기</a>
+            <RouterLink class="btn btn-secondary" to="/progress">진행 현황 보기</RouterLink>
+          </StateBlock>
         </div>
       </section>
     </section>

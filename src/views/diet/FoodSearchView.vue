@@ -23,13 +23,8 @@ function buildParams() {
   const params = {}
   const keyword = search.value.trim()
 
-  if (keyword) {
-    params.search = keyword
-  }
-
-  if (selectedCategory.value !== ALL_CATEGORY) {
-    params.category = selectedCategory.value
-  }
+  if (keyword) params.search = keyword
+  if (selectedCategory.value !== ALL_CATEGORY) params.category = selectedCategory.value
 
   return params
 }
@@ -37,6 +32,23 @@ function buildParams() {
 function syncCategories(nextFoods) {
   const nextCategories = [...new Set(nextFoods.map((food) => food.category).filter(Boolean))]
   categories.value = [ALL_CATEGORY, ...nextCategories]
+}
+
+function formatNumber(value, digits = 1) {
+  return Number(value || 0).toFixed(digits)
+}
+
+function macroRows(food) {
+  const carbohydrate = Number(food.carbohydrate || 0)
+  const protein = Number(food.protein || 0)
+  const fat = Number(food.fat || 0)
+  const total = Math.max(carbohydrate + protein + fat, 1)
+
+  return [
+    { label: '탄수화물', value: carbohydrate, ratio: Math.round((carbohydrate / total) * 100) },
+    { label: '단백질', value: protein, ratio: Math.round((protein / total) * 100) },
+    { label: '지방', value: fat, ratio: Math.round((fat / total) * 100) },
+  ]
 }
 
 async function fetchFoods(options = {}) {
@@ -85,7 +97,7 @@ onMounted(() => {
     <form class="surface-card filter-panel" @submit.prevent="handleSearch">
       <div class="field-group">
         <label for="food-search">음식명 검색</label>
-        <input id="food-search" v-model="search" type="text" placeholder="닭가슴살, 현미밥, 바나나" />
+        <input id="food-search" v-model="search" type="text" placeholder="예: 닭가슴살, 바나나" />
       </div>
 
       <div class="field-group">
@@ -122,20 +134,30 @@ onMounted(() => {
     />
 
     <section v-else class="content-grid">
-      <article
-        v-for="food in foods"
-        :key="food.id"
-        class="surface-card"
-        style="grid-column: span 4"
-      >
-        <span class="chip">{{ food.category }}</span>
-        <h2>{{ food.name }}</h2>
-        <div class="food-macro-grid">
-          <span>{{ food.calories }} kcal</span>
-          <span>탄 {{ food.carbohydrate }}g</span>
-          <span>단 {{ food.protein }}g</span>
-          <span>지 {{ food.fat }}g</span>
+      <article v-for="food in foods" :key="food.id" class="surface-card dense-card food-card" style="grid-column: span 4">
+        <div class="dense-card-header">
+          <span class="chip">{{ food.category || '미분류' }}</span>
+          <span class="dense-meta">100g 기준</span>
         </div>
+
+        <h2>{{ food.name }}</h2>
+
+        <div class="calorie-hero">
+          <strong>{{ formatNumber(food.calories, 0) }}</strong>
+          <span>kcal</span>
+        </div>
+
+        <div class="macro-list">
+          <div v-for="row in macroRows(food)" :key="row.label" class="macro-row">
+            <span>{{ row.label }}</span>
+            <strong>{{ formatNumber(row.value) }}g</strong>
+            <i :style="{ width: `${row.ratio}%` }"></i>
+          </div>
+        </div>
+
+        <RouterLink class="btn btn-secondary card-action" to="/diet/records">
+          식단에 기록하기
+        </RouterLink>
       </article>
 
       <StateBlock
@@ -144,7 +166,10 @@ onMounted(() => {
         type="empty"
         title="검색 결과가 없습니다"
         message="다른 음식명이나 카테고리로 다시 검색해보세요."
-      />
+      >
+        <button class="btn btn-secondary" type="button" @click="resetFilters">검색 초기화</button>
+        <RouterLink class="btn btn-primary" to="/diet/records">식단 기록하기</RouterLink>
+      </StateBlock>
     </section>
   </main>
 </template>

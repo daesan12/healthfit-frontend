@@ -5,8 +5,10 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
 import { createWorkoutLog, deleteWorkoutLog, getWorkoutLogs, getWorkouts } from '@/api/workout'
+import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
+const toastStore = useToastStore()
 const today = new Date().toISOString().slice(0, 10)
 
 const form = reactive({
@@ -24,18 +26,15 @@ const logs = ref([])
 const isLoading = ref(false)
 const isSaving = ref(false)
 const deletingId = ref(null)
+const pendingDeleteId = ref(null)
 const formMessage = ref('')
 const errorMessage = ref('')
 
 const selectedExercise = computed(() => exercises.value.find((exercise) => exercise.id === Number(form.exerciseId)))
-
-const logSummary = computed(() => {
-  const totalTime = logs.value.reduce((sum, log) => sum + Number(log.workoutTime || 0), 0)
-  return {
-    count: logs.value.length,
-    totalTime,
-  }
-})
+const logSummary = computed(() => ({
+  count: logs.value.length,
+  totalTime: logs.value.reduce((sum, log) => sum + Number(log.workoutTime || 0), 0),
+}))
 
 async function fetchExercises() {
   isLoading.value = true
@@ -43,15 +42,13 @@ async function fetchExercises() {
 
   try {
     exercises.value = await getWorkouts(search.value.trim() ? { search: search.value.trim() } : {})
-
     if (route.query.exerciseId && exercises.value.some((exercise) => exercise.id === Number(route.query.exerciseId))) {
       form.exerciseId = Number(route.query.exerciseId)
     } else if (!form.exerciseId && exercises.value[0]) {
       form.exerciseId = exercises.value[0].id
     }
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
-    errorMessage.value = apiError.message
+    errorMessage.value = normalizeCaughtError(error).message
   } finally {
     isLoading.value = false
   }
@@ -61,13 +58,13 @@ async function fetchLogs() {
   try {
     logs.value = await getWorkoutLogs({ date: form.workoutDate })
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
-    errorMessage.value = apiError.message
+    errorMessage.value = normalizeCaughtError(error).message
   }
 }
 
 async function saveLog() {
   formMessage.value = ''
+  pendingDeleteId.value = null
 
   if (!form.exerciseId) {
     formMessage.value = '기록할 운동을 선택해주세요.'
@@ -85,32 +82,45 @@ async function saveLog() {
     await createWorkoutLog({ ...form })
     form.memo = ''
     formMessage.value = '운동 기록이 저장되었습니다.'
+    toastStore.success('운동 저장 완료', '운동 기록이 진행 현황에 반영되었습니다.')
     await fetchLogs()
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
-    formMessage.value = apiError.message
+    formMessage.value = normalizeCaughtError(error).message
   } finally {
     isSaving.value = false
   }
 }
 
 async function removeLog(logId) {
-  deletingId.value = logId
   formMessage.value = ''
+
+  if (pendingDeleteId.value !== logId) {
+    pendingDeleteId.value = logId
+    formMessage.value = '삭제하려면 같은 버튼을 한 번 더 눌러주세요.'
+    return
+  }
+
+  deletingId.value = logId
 
   try {
     await deleteWorkoutLog(logId)
     logs.value = logs.value.filter((log) => log.id !== logId)
     formMessage.value = '운동 기록이 삭제되었습니다.'
+    pendingDeleteId.value = null
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
-    formMessage.value = apiError.message
+    formMessage.value = normalizeCaughtError(error).message
   } finally {
     deletingId.value = null
   }
 }
 
+function cancelDelete() {
+  pendingDeleteId.value = null
+  formMessage.value = ''
+}
+
 async function handleDateChange() {
+  pendingDeleteId.value = null
   await fetchLogs()
 }
 
@@ -143,7 +153,7 @@ onMounted(async () => {
     />
 
     <section v-else class="content-grid">
-      <form class="form-card" style="grid-column: span 5" @submit.prevent="saveLog">
+      <form class="form-card mobile-friendly-form" style="grid-column: span 5" @submit.prevent="saveLog">
         <div class="field-group">
           <label for="workout-date">운동 날짜</label>
           <input id="workout-date" v-model="form.workoutDate" type="date" @change="handleDateChange" />
@@ -151,7 +161,7 @@ onMounted(async () => {
 
         <div class="field-group">
           <label for="exercise-search">운동 검색</label>
-          <div class="button-row">
+          <div class="inline-controls mobile-stack">
             <input id="exercise-search" v-model="search" type="text" placeholder="push up, squat" />
             <button class="btn btn-secondary" type="button" :disabled="isLoading" @click="fetchExercises">검색</button>
           </div>
@@ -160,30 +170,28 @@ onMounted(async () => {
         <div class="field-group">
           <label for="exercise">운동</label>
           <select id="exercise" v-model="form.exerciseId">
-            <option v-for="exercise in exercises" :key="exercise.id" :value="exercise.id">
-              {{ exercise.name }}
-            </option>
+            <option v-for="exercise in exercises" :key="exercise.id" :value="exercise.id">{{ exercise.name }}</option>
           </select>
         </div>
 
-        <div class="content-grid">
+        <div class="content-grid compact-form-grid">
           <div class="field-group" style="grid-column: span 4">
             <label for="workout-time">시간(분)</label>
-            <input id="workout-time" v-model.number="form.workoutTime" type="number" min="0" />
+            <input id="workout-time" v-model.number="form.workoutTime" type="number" inputmode="numeric" min="0" />
           </div>
           <div class="field-group" style="grid-column: span 4">
             <label for="set-count">세트</label>
-            <input id="set-count" v-model.number="form.setCount" type="number" min="0" />
+            <input id="set-count" v-model.number="form.setCount" type="number" inputmode="numeric" min="0" />
           </div>
           <div class="field-group" style="grid-column: span 4">
             <label for="repetition">반복</label>
-            <input id="repetition" v-model.number="form.repetition" type="number" min="0" />
+            <input id="repetition" v-model.number="form.repetition" type="number" inputmode="numeric" min="0" />
           </div>
         </div>
 
         <div class="field-group">
           <label for="memo">메모</label>
-          <textarea id="memo" v-model="form.memo" placeholder="운동 난이도, 컨디션, 자세 느낌을 남겨보세요." />
+          <textarea id="memo" v-model="form.memo" placeholder="운동 난이도, 컨디션, 자세 피드백을 남겨보세요." />
         </div>
 
         <div v-if="selectedExercise" class="nutrition-preview">
@@ -192,7 +200,7 @@ onMounted(async () => {
           <p>{{ selectedExercise.bodyParts.join(', ') }} · {{ selectedExercise.equipments.join(', ') || '장비 없음' }}</p>
         </div>
 
-        <div class="button-row">
+        <div class="button-row form-actions">
           <button class="btn btn-primary" type="submit" :disabled="isSaving">
             {{ isSaving ? '저장 중...' : '운동 기록 저장' }}
           </button>
@@ -217,11 +225,17 @@ onMounted(async () => {
               <span>{{ log.workoutTime }}분 · {{ log.setCount }}세트 · {{ log.repetition }}회</span>
               <span v-if="log.memo">{{ log.memo }}</span>
             </div>
-            <div>
+            <div class="delete-actions">
               <strong>{{ log.workoutDate }}</strong>
-              <button type="button" :disabled="deletingId === log.id" @click="removeLog(log.id)">
-                {{ deletingId === log.id ? '삭제 중...' : '삭제' }}
+              <button
+                type="button"
+                :class="{ 'is-danger': pendingDeleteId === log.id }"
+                :disabled="deletingId === log.id"
+                @click="removeLog(log.id)"
+              >
+                {{ deletingId === log.id ? '삭제 중...' : pendingDeleteId === log.id ? '확인 삭제' : '삭제' }}
               </button>
+              <button v-if="pendingDeleteId === log.id" type="button" @click="cancelDelete">취소</button>
             </div>
           </article>
 
@@ -230,7 +244,10 @@ onMounted(async () => {
             type="empty"
             title="저장된 운동 기록이 없습니다"
             message="왼쪽 폼에서 오늘 수행한 운동을 기록해보세요."
-          />
+          >
+            <a class="btn btn-primary" href="#exercise">운동 기록하기</a>
+            <RouterLink class="btn btn-secondary" to="/workouts">운동 찾기</RouterLink>
+          </StateBlock>
         </div>
       </section>
     </section>

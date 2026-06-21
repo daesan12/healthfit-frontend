@@ -25,30 +25,26 @@ function buildParams() {
   const params = {}
   const keyword = search.value.trim()
 
-  if (keyword) {
-    params.search = keyword
-  }
-
-  if (selectedPart.value !== ALL_FILTER) {
-    params.body_part = selectedPart.value
-  }
-
-  if (selectedEquipment.value !== ALL_FILTER) {
-    params.equipment = selectedEquipment.value
-  }
+  if (keyword) params.search = keyword
+  if (selectedPart.value !== ALL_FILTER) params.body_part = selectedPart.value
+  if (selectedEquipment.value !== ALL_FILTER) params.equipment = selectedEquipment.value
 
   return params
 }
 
 function syncFilters(nextWorkouts) {
-  bodyParts.value = [
-    ALL_FILTER,
-    ...new Set(nextWorkouts.flatMap((workout) => workout.bodyParts || []).filter(Boolean)),
-  ]
+  bodyParts.value = [ALL_FILTER, ...new Set(nextWorkouts.flatMap((workout) => workout.bodyParts || []).filter(Boolean))]
   equipments.value = [
     ALL_FILTER,
     ...new Set(nextWorkouts.flatMap((workout) => workout.equipments || []).filter(Boolean)),
   ]
+}
+
+function compactList(items, emptyText = '정보 없음', limit = 3) {
+  const list = Array.isArray(items) ? items.filter(Boolean) : []
+  if (list.length === 0) return emptyText
+  if (list.length <= limit) return list.join(', ')
+  return `${list.slice(0, limit).join(', ')} 외 ${list.length - limit}개`
 }
 
 async function fetchWorkouts(options = {}) {
@@ -71,15 +67,15 @@ async function fetchWorkouts(options = {}) {
   }
 }
 
-function handleSearch() {
-  fetchWorkouts({ params: buildParams() })
-}
-
 function resetFilters() {
   search.value = ''
   selectedPart.value = ALL_FILTER
   selectedEquipment.value = ALL_FILTER
   fetchWorkouts({ syncFilters: true })
+}
+
+function handleSearch() {
+  fetchWorkouts({ params: buildParams() })
 }
 
 onMounted(() => {
@@ -145,26 +141,37 @@ onMounted(() => {
     />
 
     <section v-else class="content-grid">
-      <article
-        v-for="workout in workouts"
-        :key="workout.id"
-        class="surface-card"
-        style="grid-column: span 4"
-      >
-        <p class="section-label">{{ workout.equipments.join(', ') || '장비 없음' }}</p>
-        <h2>{{ workout.name }}</h2>
-        <div class="chip-list">
-          <span v-for="part in workout.bodyParts" :key="part" class="chip">{{ part }}</span>
+      <article v-for="workout in workouts" :key="workout.id" class="surface-card dense-card workout-card" style="grid-column: span 4">
+        <div class="dense-card-header">
+          <span class="chip">{{ compactList(workout.bodyParts, '부위 없음', 2) }}</span>
+          <span class="dense-meta">{{ compactList(workout.equipments, '장비 없음', 1) }}</span>
         </div>
-        <p class="card-description">
-          주요 타깃 근육: {{ workout.targetMuscles.join(', ') || '정보 없음' }}
-        </p>
-        <ol class="instruction-list">
+
+        <h2>{{ workout.name }}</h2>
+
+        <dl class="dense-info-list">
+          <div>
+            <dt>타깃</dt>
+            <dd>{{ compactList(workout.targetMuscles) }}</dd>
+          </div>
+          <div>
+            <dt>보조</dt>
+            <dd>{{ compactList(workout.secondaryMuscles, '보조 근육 없음') }}</dd>
+          </div>
+          <div>
+            <dt>동작</dt>
+            <dd>{{ workout.instructions.length || 0 }}단계</dd>
+          </div>
+        </dl>
+
+        <ol class="instruction-list dense-instructions">
           <li v-for="instruction in workout.instructions.slice(0, 2)" :key="instruction">
             {{ instruction }}
           </li>
+          <li v-if="workout.instructions.length > 2">나머지는 상세 화면에서 확인</li>
         </ol>
-        <div class="button-row">
+
+        <div class="button-row dense-card-actions">
           <RouterLink class="btn btn-secondary card-action" :to="`/workouts/${workout.id}`">
             상세 보기
           </RouterLink>
@@ -180,7 +187,10 @@ onMounted(() => {
         type="empty"
         title="검색 결과가 없습니다"
         message="운동명, 부위, 장비 조건을 바꿔 다시 검색해보세요."
-      />
+      >
+        <button class="btn btn-secondary" type="button" @click="resetFilters">검색 초기화</button>
+        <RouterLink class="btn btn-primary" to="/workout/logs">운동 기록하기</RouterLink>
+      </StateBlock>
     </section>
   </main>
 </template>

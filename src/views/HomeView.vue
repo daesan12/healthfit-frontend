@@ -1,68 +1,142 @@
 <script setup>
+import { computed, onMounted, ref } from 'vue'
+import { normalizeCaughtError } from '@/api/client'
+import { getProgress } from '@/api/progress'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const today = new Date().toISOString().slice(0, 10)
+
+const progress = ref(null)
+const isLoading = ref(false)
+const errorMessage = ref('')
+
 const highlights = [
   { value: '2,322', label: '정제 음식 데이터' },
   { value: '415', label: '운동 데이터' },
   { value: '25', label: '핵심 요구사항' },
 ]
 
-const featureCards = [
+const todayCards = computed(() => [
   {
-    title: 'AI 식단 추천',
-    text: '프로필과 권장 칼로리를 기준으로 아침, 점심, 저녁, 간식 식단을 추천합니다.',
-    to: '/diet/recommend',
+    label: '오늘 식단',
+    value: `${Math.round(progress.value?.mealSummary.totalCalories || 0)} kcal`,
+    hint: `${progress.value?.mealSummary.mealCount || 0}개 식단 기록`,
+    to: '/diet/records',
+    action: '식단 기록',
   },
   {
-    title: '운동 루틴 관리',
-    text: '운동 목표와 경험에 맞는 루틴을 만들고 실제 수행 기록을 남길 수 있습니다.',
-    to: '/workout/recommend',
+    label: '오늘 운동',
+    value: `${progress.value?.workoutSummary.totalWorkoutTime || 0}분`,
+    hint: `${progress.value?.workoutSummary.workoutCount || 0}개 운동 기록`,
+    to: '/workout/logs',
+    action: '운동 기록',
   },
   {
-    title: '진행 현황 시각화',
-    text: '체중, 섭취 칼로리, 운동 시간을 기간별로 확인합니다.',
-    to: '/progress',
+    label: '체중 변화',
+    value: formatWeightChange(progress.value?.bodySummary.weightChange),
+    hint: progress.value?.bodySummary.latestWeight
+      ? `최근 ${progress.value.bodySummary.latestWeight}kg`
+      : '오늘 신체 기록을 남겨보세요',
+    to: '/body-records',
+    action: '신체 기록',
   },
+])
+
+const quickActions = [
+  { title: '기록 허브', text: '식단, 운동, 신체 기록을 한 곳에서 시작합니다.', to: '/records' },
+  { title: '진행 현황', text: '기록한 데이터를 기간별로 확인합니다.', to: '/progress' },
+  { title: 'AI 상담', text: 'AI 기능은 백엔드 구현 후 최종 연동합니다.', to: '/ai-chat' },
 ]
+
+function formatWeightChange(value) {
+  if (value === null || value === undefined) return '기록 없음'
+  const number = Number(value)
+  const sign = number > 0 ? '+' : ''
+  return `${sign}${number.toFixed(1)}kg`
+}
+
+async function fetchTodayProgress() {
+  if (!authStore.isAuthenticated) return
+
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    progress.value = await getProgress({
+      start_date: today,
+      end_date: today,
+    })
+  } catch (error) {
+    const apiError = normalizeCaughtError(error)
+    errorMessage.value = apiError.message
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(fetchTodayProgress)
 </script>
 
 <template>
   <main class="home-page">
-    <section class="hero-section">
+    <section class="hero-section home-dashboard-hero">
       <div class="hero-copy">
         <p class="section-label">AI 맞춤 식단·운동 추천 서비스</p>
         <h1>오늘의 기록이 내일의 루틴이 되는 HealthFit</h1>
         <p class="hero-description">
-          신체 정보, 식단 기록, 운동 기록을 바탕으로 개인에게 맞는 건강 관리 흐름을 만들고
-          진행 현황을 한눈에 확인하는 플랫폼입니다.
+          식단, 운동, 신체 기록을 한 곳에 모으고 진행 현황에서 변화를 확인하는 건강 관리 플랫폼입니다.
         </p>
 
         <div class="hero-actions">
-          <RouterLink class="primary-link large" to="/profile">프로필 시작</RouterLink>
-          <RouterLink class="secondary-link large" to="/diet">식단 대시보드</RouterLink>
+          <RouterLink class="primary-link large" :to="authStore.isAuthenticated ? '/records' : '/signup'">
+            {{ authStore.isAuthenticated ? '오늘 기록하기' : '시작하기' }}
+          </RouterLink>
+          <RouterLink class="secondary-link large" to="/progress">진행 현황 보기</RouterLink>
         </div>
       </div>
 
-      <div class="insight-panel" aria-label="HealthFit summary">
-        <div class="score-card">
-          <span class="score-label">오늘의 식단 점수</span>
-          <strong>86</strong>
-          <span class="score-note">단백질 비율이 좋아요</span>
+      <section class="today-panel" aria-label="Today dashboard">
+        <div class="section-heading-row">
+          <div>
+            <p class="section-label">Today</p>
+            <h2>{{ authStore.isAuthenticated ? '오늘 요약' : '기록 시작 가이드' }}</h2>
+          </div>
+          <span class="chip">{{ today }}</span>
         </div>
-        <div class="macro-row">
-          <span>탄수화물</span>
-          <div class="meter"><i style="width: 54%"></i></div>
-          <strong>54%</strong>
-        </div>
-        <div class="macro-row">
-          <span>단백질</span>
-          <div class="meter"><i style="width: 31%"></i></div>
-          <strong>31%</strong>
-        </div>
-        <div class="macro-row">
-          <span>지방</span>
-          <div class="meter"><i style="width: 18%"></i></div>
-          <strong>18%</strong>
-        </div>
-      </div>
+
+        <p v-if="errorMessage" class="form-message">{{ errorMessage }}</p>
+
+        <template v-if="authStore.isAuthenticated">
+          <article v-for="card in todayCards" :key="card.label" class="today-card">
+            <div>
+              <span>{{ card.label }}</span>
+              <strong>{{ isLoading ? '조회 중...' : card.value }}</strong>
+              <p>{{ card.hint }}</p>
+            </div>
+            <RouterLink class="btn btn-secondary" :to="card.to">{{ card.action }}</RouterLink>
+          </article>
+        </template>
+
+        <template v-else>
+          <article class="today-card">
+            <div>
+              <span>1단계</span>
+              <strong>프로필 입력</strong>
+              <p>권장 칼로리와 추천 기준을 먼저 저장합니다.</p>
+            </div>
+            <RouterLink class="btn btn-secondary" to="/signup">회원가입</RouterLink>
+          </article>
+          <article class="today-card">
+            <div>
+              <span>2단계</span>
+              <strong>기록 남기기</strong>
+              <p>식단, 운동, 신체 기록을 날짜별로 쌓습니다.</p>
+            </div>
+            <RouterLink class="btn btn-secondary" to="/login">로그인</RouterLink>
+          </article>
+        </template>
+      </section>
     </section>
 
     <section class="stats-grid" aria-label="Project data summary">
@@ -72,10 +146,10 @@ const featureCards = [
       </article>
     </section>
 
-    <section class="feature-grid" aria-label="Core features">
-      <RouterLink v-for="feature in featureCards" :key="feature.title" :to="feature.to">
-        <h2>{{ feature.title }}</h2>
-        <p>{{ feature.text }}</p>
+    <section class="feature-grid" aria-label="Quick actions">
+      <RouterLink v-for="action in quickActions" :key="action.title" :to="action.to">
+        <h2>{{ action.title }}</h2>
+        <p>{{ action.text }}</p>
       </RouterLink>
     </section>
   </main>

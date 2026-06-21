@@ -4,8 +4,10 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { mapFieldErrors, normalizeCaughtError } from '@/api/client'
 import { useProfileStore } from '@/stores/profile'
+import { useToastStore } from '@/stores/toast'
 
 const profileStore = useProfileStore()
+const toastStore = useToastStore()
 
 const profile = reactive({
   gender: 'male',
@@ -93,6 +95,7 @@ async function handleProfileSave() {
     const savedProfile = await profileStore.saveProfile({ ...profile })
     fillProfile(savedProfile)
     formMessage.value = '프로필이 저장되었습니다.'
+    toastStore.success('프로필 저장 완료', '맞춤 추천에 사용할 정보가 갱신되었습니다.')
   } catch (error) {
     const apiError = normalizeCaughtError(error)
     applyServerErrors(apiError.errors)
@@ -125,16 +128,16 @@ onMounted(async () => {
       v-if="profileStore.isLoading && !profileStore.hasProfile"
       type="loading"
       title="프로필을 불러오는 중입니다"
-      message="저장된 정보가 있으면 자동으로 입력됩니다."
+      message="저장된 정보가 있으면 자동으로 입력합니다."
     />
 
     <section v-else class="content-grid">
-      <form class="form-card" style="grid-column: span 8" @submit.prevent="handleProfileSave">
+      <form class="form-card mobile-friendly-form" style="grid-column: span 8" @submit.prevent="handleProfileSave">
         <p v-if="loadMessage && !profileStore.hasProfile" class="form-message">
           저장된 프로필이 없습니다. 새로 입력하면 추천 기능에 사용할 수 있습니다.
         </p>
 
-        <div class="content-grid">
+        <div class="content-grid compact-form-grid">
           <div class="field-group" style="grid-column: span 6">
             <label for="gender">성별</label>
             <select id="gender" v-model="profile.gender">
@@ -145,19 +148,19 @@ onMounted(async () => {
 
           <div class="field-group" style="grid-column: span 6" :class="{ 'has-error': errors.age }">
             <label for="age">나이</label>
-            <input id="age" v-model.number="profile.age" type="number" placeholder="27" />
+            <input id="age" v-model.number="profile.age" type="number" inputmode="numeric" min="10" max="100" placeholder="27" />
             <p v-if="errors.age" class="error-text">{{ errors.age }}</p>
           </div>
 
           <div class="field-group" style="grid-column: span 4" :class="{ 'has-error': errors.height }">
             <label for="height">키(cm)</label>
-            <input id="height" v-model.number="profile.height" type="number" placeholder="181" />
+            <input id="height" v-model.number="profile.height" type="number" inputmode="decimal" min="100" max="230" step="0.1" placeholder="181" />
             <p v-if="errors.height" class="error-text">{{ errors.height }}</p>
           </div>
 
           <div class="field-group" style="grid-column: span 4" :class="{ 'has-error': errors.weight }">
             <label for="weight">몸무게(kg)</label>
-            <input id="weight" v-model.number="profile.weight" type="number" placeholder="72" />
+            <input id="weight" v-model.number="profile.weight" type="number" inputmode="decimal" min="30" max="250" step="0.1" placeholder="72" />
             <p v-if="errors.weight" class="error-text">{{ errors.weight }}</p>
           </div>
 
@@ -203,7 +206,7 @@ onMounted(async () => {
 
         <p v-if="formMessage" class="form-message">{{ formMessage }}</p>
 
-        <div class="button-row">
+        <div class="button-row form-actions">
           <button class="btn btn-primary" type="submit" :disabled="profileStore.isLoading">
             {{ profileStore.isLoading ? '저장 중...' : '프로필 저장' }}
           </button>

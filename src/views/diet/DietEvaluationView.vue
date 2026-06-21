@@ -12,7 +12,7 @@ const calorieRate = computed(() =>
 )
 
 function requestEvaluation() {
-  requestMessage.value = 'AI 서버 연동 전까지는 예시 평가 결과를 표시합니다.'
+  requestMessage.value = 'AI 백엔드 연동 전까지는 예시 평가 결과를 표시합니다.'
 }
 </script>
 
@@ -21,8 +21,13 @@ function requestEvaluation() {
     <PageHeader
       eyebrow="Diet AI"
       title="오늘의 식단 평가"
-      description="기록한 식단을 권장 칼로리와 탄단지 기준으로 분석합니다."
+      description="기록한 식단을 권장 칼로리와 탄단지 기준으로 분석하는 화면입니다."
     />
+
+    <div class="ai-status-banner">
+      <span class="status-badge">AI 준비 중</span>
+      <p>현재는 예시 평가 결과를 보여줍니다. 백엔드 구현 후 `/api/v1/ai/diet/evaluations/`와 연결합니다.</p>
+    </div>
 
     <section class="content-grid">
       <form class="form-card" style="grid-column: span 4" @submit.prevent="requestEvaluation">
@@ -31,7 +36,7 @@ function requestEvaluation() {
           <input id="evaluation-date" v-model="targetDate" type="date" />
         </div>
 
-        <button class="btn btn-primary" type="submit">식단 평가 요청</button>
+        <button class="btn btn-primary" type="submit">예시 평가 보기</button>
         <RouterLink class="btn btn-secondary" to="/diet/records">식단 기록 수정</RouterLink>
         <p v-if="requestMessage" class="form-message">{{ requestMessage }}</p>
       </form>

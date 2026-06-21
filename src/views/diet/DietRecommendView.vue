@@ -13,12 +13,12 @@ const saveMessage = ref('')
 const requestMessage = ref('')
 
 function requestRecommendation() {
-  requestMessage.value = 'AI 서버 연동 전까지는 예시 추천 식단을 표시합니다.'
+  requestMessage.value = 'AI 백엔드 연동 전까지는 예시 추천 식단을 표시합니다.'
 }
 
 function saveRecommendation() {
   savedItemsStore.saveMeal(recommendation.value)
-  saveMessage.value = '추천 식단을 임시 저장했습니다. 저장 식단 API 연동 시 실제 저장으로 전환됩니다.'
+  saveMessage.value = '추천 식단을 임시 저장했습니다. 저장 식단 API 연동 후 실제 저장으로 전환합니다.'
 }
 </script>
 
@@ -27,8 +27,13 @@ function saveRecommendation() {
     <PageHeader
       eyebrow="Diet AI"
       title="AI 식단 추천"
-      description="프로필과 권장 칼로리를 기준으로 하루 식단을 추천받습니다."
+      description="프로필과 권장 칼로리를 기준으로 하루 식단을 추천받는 화면입니다."
     />
+
+    <div class="ai-status-banner">
+      <span class="status-badge">AI 준비 중</span>
+      <p>현재는 예시 식단을 보여줍니다. 백엔드 구현 후 `/api/v1/ai/diet/recommendations/`와 연결합니다.</p>
+    </div>
 
     <section class="content-grid">
       <form class="form-card" style="grid-column: span 4" @submit.prevent="requestRecommendation">
@@ -50,7 +55,7 @@ function saveRecommendation() {
           <textarea id="preference" v-model="preference" />
         </div>
 
-        <button class="btn btn-primary" type="submit">추천 요청</button>
+        <button class="btn btn-primary" type="submit">예시 추천 보기</button>
         <p v-if="requestMessage" class="form-message">{{ requestMessage }}</p>
       </form>
 
@@ -61,7 +66,7 @@ function saveRecommendation() {
             <h2>{{ recommendation.title }}</h2>
           </div>
           <button class="btn btn-secondary" type="button" @click="saveRecommendation">
-            추천 식단 저장
+            추천 식단 임시 저장
           </button>
         </div>
 

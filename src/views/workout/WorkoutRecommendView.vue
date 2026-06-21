@@ -13,12 +13,12 @@ const saveMessage = ref('')
 const requestMessage = ref('')
 
 function requestRecommendation() {
-  requestMessage.value = 'AI 서버 연동 전까지는 예시 운동 루틴을 표시합니다.'
+  requestMessage.value = 'AI 백엔드 연동 전까지는 예시 운동 루틴을 표시합니다.'
 }
 
 function saveRoutine() {
   savedItemsStore.saveRoutine(recommendation.value)
-  saveMessage.value = '운동 루틴을 임시 저장했습니다. 루틴 저장 API 연동 시 실제 저장으로 전환됩니다.'
+  saveMessage.value = '운동 루틴을 임시 저장했습니다. 루틴 저장 API 연동 후 실제 저장으로 전환합니다.'
 }
 </script>
 
@@ -27,13 +27,18 @@ function saveRoutine() {
     <PageHeader
       eyebrow="Workout AI"
       title="AI 운동 추천"
-      description="운동 경험, 목표, 가능 시간을 기준으로 루틴을 추천받습니다."
+      description="운동 경험, 목표, 가능한 시간을 기준으로 루틴을 추천받는 화면입니다."
     />
+
+    <div class="ai-status-banner">
+      <span class="status-badge">AI 준비 중</span>
+      <p>현재는 예시 루틴을 보여줍니다. 백엔드 구현 후 `/api/v1/ai/workout/recommendations/`와 연결합니다.</p>
+    </div>
 
     <section class="content-grid">
       <form class="form-card" style="grid-column: span 4" @submit.prevent="requestRecommendation">
         <div class="field-group">
-          <label for="available-time">운동 가능 시간</label>
+          <label for="available-time">운동 가능 시간(분)</label>
           <input id="available-time" v-model.number="availableTime" type="number" min="10" />
         </div>
 
@@ -52,7 +57,7 @@ function saveRoutine() {
           <textarea id="workout-preference" v-model="preference" />
         </div>
 
-        <button class="btn btn-primary" type="submit">운동 추천 요청</button>
+        <button class="btn btn-primary" type="submit">예시 루틴 보기</button>
         <p v-if="requestMessage" class="form-message">{{ requestMessage }}</p>
       </form>
 
@@ -62,7 +67,7 @@ function saveRoutine() {
             <p class="section-label">Routine</p>
             <h2>{{ recommendation.title }}</h2>
           </div>
-          <button class="btn btn-secondary" type="button" @click="saveRoutine">루틴 저장</button>
+          <button class="btn btn-secondary" type="button" @click="saveRoutine">루틴 임시 저장</button>
         </div>
 
         <p v-if="saveMessage" class="form-message">{{ saveMessage }}</p>

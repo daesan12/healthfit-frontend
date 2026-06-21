@@ -6,16 +6,19 @@ import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { useCommunityStore } from '@/stores/community'
+import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const authStore = useAuthStore()
 const communityStore = useCommunityStore()
+const toastStore = useToastStore()
 const newComment = ref('')
 const formMessage = ref('')
 const errorMessage = ref('')
 const isCommentSubmitting = ref(false)
 const isLikeSubmitting = ref(false)
 const deletingCommentId = ref(null)
+const pendingDeleteCommentId = ref(null)
 
 const post = computed(() => communityStore.currentPost)
 const comments = computed(() => post.value?.commentItems || [])
@@ -60,7 +63,9 @@ async function addComment() {
   try {
     await communityStore.addComment(route.params.id, content)
     newComment.value = ''
+    pendingDeleteCommentId.value = null
     formMessage.value = '댓글이 작성되었습니다.'
+    toastStore.success('댓글 작성 완료', '게시글에 댓글이 추가되었습니다.')
   } catch (error) {
     const apiError = normalizeCaughtError(error)
     formMessage.value = apiError.message
@@ -77,10 +82,17 @@ async function removeComment(commentId) {
     return
   }
 
+  if (pendingDeleteCommentId.value !== commentId) {
+    pendingDeleteCommentId.value = commentId
+    formMessage.value = '댓글을 삭제하려면 같은 버튼을 한 번 더 눌러주세요.'
+    return
+  }
+
   deletingCommentId.value = commentId
 
   try {
     await communityStore.removeComment(route.params.id, commentId)
+    pendingDeleteCommentId.value = null
     formMessage.value = '댓글이 삭제되었습니다.'
   } catch (error) {
     const apiError = normalizeCaughtError(error)
@@ -88,6 +100,11 @@ async function removeComment(commentId) {
   } finally {
     deletingCommentId.value = null
   }
+}
+
+function cancelDeleteComment() {
+  pendingDeleteCommentId.value = null
+  formMessage.value = ''
 }
 
 async function toggleLike() {
@@ -171,7 +188,7 @@ onMounted(fetchPost)
           </div>
 
           <form class="comment-form" @submit.prevent="addComment">
-            <textarea v-model="newComment" placeholder="댓글을 입력하세요." />
+            <textarea id="comment-input" v-model="newComment" placeholder="댓글을 입력하세요." />
             <button class="btn btn-primary" type="submit" :disabled="isCommentSubmitting">
               {{ isCommentSubmitting ? '작성 중...' : '댓글 작성' }}
             </button>
@@ -185,9 +202,25 @@ onMounted(fetchPost)
               <span>{{ comment.createdAt }}</span>
               <p>{{ comment.content }}</p>
             </div>
-            <button type="button" :disabled="deletingCommentId === comment.id" @click="removeComment(comment.id)">
-              {{ deletingCommentId === comment.id ? '삭제 중...' : '삭제' }}
-            </button>
+            <div class="delete-actions">
+              <button
+                type="button"
+                :class="{ 'is-danger': pendingDeleteCommentId === comment.id }"
+                :disabled="deletingCommentId === comment.id"
+                @click="removeComment(comment.id)"
+              >
+                {{
+                  deletingCommentId === comment.id
+                    ? '삭제 중...'
+                    : pendingDeleteCommentId === comment.id
+                      ? '확인 삭제'
+                      : '삭제'
+                }}
+              </button>
+              <button v-if="pendingDeleteCommentId === comment.id" type="button" @click="cancelDeleteComment">
+                취소
+              </button>
+            </div>
           </article>
 
           <StateBlock
@@ -195,7 +228,9 @@ onMounted(fetchPost)
             type="empty"
             title="댓글이 없습니다"
             message="첫 댓글로 대화를 시작해보세요."
-          />
+          >
+            <a class="btn btn-primary" href="#comment-input">댓글 작성하기</a>
+          </StateBlock>
         </section>
       </section>
     </template>

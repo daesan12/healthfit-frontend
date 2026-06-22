@@ -215,8 +215,8 @@ onMounted(() => loadChats(1))
 
       <form class="form-card" style="grid-column: span 4; align-self: start" @submit.prevent="askQuestion">
         <div class="ai-status-banner">
-          <span class="status-badge">PT Coach</span>
-          <p>백엔드 가드레일과 최근 대화 기록을 기반으로 답변하고, 질문과 답변은 자동 저장됩니다.</p>
+          <span class="status-badge">PT 코치</span>
+          <p>최근 대화 기록을 기반으로 답변하고, 질문과 답변은 자동 저장됩니다.</p>
         </div>
 
         <div class="field-group">

@@ -10,7 +10,7 @@ const recordCards = [
   {
     title: '저장 식단',
     eyebrow: 'Saved Meal',
-    description: '자주 먹는 식단을 저장하고 실제 Meal 기록으로 복사합니다.',
+    description: '자주 먹는 식단을 저장하고 실제 식사 기록으로 복사합니다.',
     to: '/saved-meals',
     action: '저장 식단 관리',
   },
@@ -46,7 +46,7 @@ const recordCards = [
 
 const quickLinks = [
   { label: '진행 현황 보기', to: '/progress' },
-  { label: '음식 검색', to: '/foods' },
+  { label: '음식 찾기', to: '/foods' },
   { label: '운동 찾기', to: '/workouts' },
   { label: 'AI 식단 추천', to: '/diet/recommend' },
   { label: 'AI 식단 평가', to: '/diet/evaluation' },

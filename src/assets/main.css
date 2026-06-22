@@ -1385,6 +1385,30 @@ a {
   justify-content: space-between;
 }
 
+.workout-card-media {
+  display: grid;
+  place-items: center;
+  height: 170px;
+  margin: 0.8rem 0 0.9rem;
+  overflow: visible;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f8fbf6 0%, #eef5ee 100%);
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.workout-card-media img {
+  width: auto;
+  max-width: calc(100% - 1.5rem);
+  height: auto;
+  max-height: calc(100% - 1.5rem);
+  object-fit: contain;
+  object-position: center center;
+  background: white;
+}
+
 .dense-meta {
   color: var(--color-muted);
   font-size: 0.82rem;

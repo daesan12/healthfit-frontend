@@ -20,6 +20,11 @@ export async function getFoodsPage(params) {
   return mapPaginatedData(unwrapResponse(response), mapFood)
 }
 
+export async function getFood(foodId) {
+  const response = await apiClient.get(`/foods/${foodId}/`)
+  return mapFood(unwrapResponse(response))
+}
+
 function toFoodPayload(food) {
   return {
     name: food.name,

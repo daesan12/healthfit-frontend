@@ -169,6 +169,16 @@ onMounted(() => {
           <span class="dense-meta">{{ compactList(workout.equipments, '장비 없음', 1) }}</span>
         </div>
 
+        <div class="workout-card-media">
+          <img
+            v-if="workout.gifUrl"
+            :src="workout.gifUrl"
+            :alt="`${workout.name} 운동 예시`"
+            loading="lazy"
+          />
+          <span v-else>이미지 없음</span>
+        </div>
+
         <h2>{{ workout.name }}</h2>
 
         <dl class="dense-info-list">

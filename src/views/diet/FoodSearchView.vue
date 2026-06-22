@@ -177,7 +177,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <RouterLink class="btn btn-secondary card-action" to="/diet/records">
+        <RouterLink class="btn btn-secondary card-action" :to="{ name: 'diet-records', query: { foodId: food.id, foodName: food.name } }">
           식단에 기록하기
         </RouterLink>
       </article>

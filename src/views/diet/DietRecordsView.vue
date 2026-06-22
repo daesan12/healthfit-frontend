@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
@@ -8,6 +9,7 @@ import {
   createMeal,
   deleteMeal,
   deleteMealItem,
+  getFood,
   getFoods,
   getMeal,
   getMealsPage,
@@ -16,6 +18,7 @@ import {
 } from '@/api/diet'
 import { useToastStore } from '@/stores/toast'
 
+const route = useRoute()
 const mealTypes = [
   { label: '아침', value: 'breakfast' },
   { label: '점심', value: 'lunch' },
@@ -161,6 +164,22 @@ async function fetchFoods() {
     errorMessage.value = normalizeCaughtError(error).message
   } finally {
     isLoading.value = false
+  }
+}
+
+async function applyRouteFoodSelection() {
+  const routeFoodId = Number(route.query.foodId || 0)
+  if (!routeFoodId) return
+
+  try {
+    const food = await getFood(routeFoodId)
+    if (!foods.value.some((candidate) => candidate.id === food.id)) {
+      foods.value = [food, ...foods.value]
+    }
+    selectedFoodId.value = food.id
+    foodSearch.value = food.name || String(route.query.foodName || '')
+  } catch (error) {
+    if (route.query.foodName) foodSearch.value = String(route.query.foodName)
   }
 }
 
@@ -379,6 +398,7 @@ async function handleDateChange() {
 
 onMounted(async () => {
   await fetchFoods()
+  await applyRouteFoodSelection()
   await fetchMeals(1)
 })
 </script>

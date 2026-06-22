@@ -1,7 +1,7 @@
 <script setup>
 const recordCards = [
   {
-    title: '식단 기록',
+    title: '하루 기록',
     eyebrow: 'Meal',
     description: '하루 식사와 섭취량을 기록하고 대시보드에서 영양 합계를 확인합니다.',
     to: '/diet/records',

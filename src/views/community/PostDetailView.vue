@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
@@ -12,6 +12,7 @@ import { useCommunityStore } from '@/stores/community'
 import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const communityStore = useCommunityStore()
 const toastStore = useToastStore()
@@ -27,12 +28,17 @@ const editingCommentId = ref(null)
 const editingCommentContent = ref('')
 const deletingCommentId = ref(null)
 const pendingDeleteCommentId = ref(null)
+const deletingPostId = ref(null)
+const pendingDeletePostId = ref(null)
 
 const post = computed(() => communityStore.currentPost)
 const comments = computed(() => communityStore.commentItems)
 const commentPagination = computed(() => communityStore.commentPagination)
 const hasSharedSnapshot = computed(() => Boolean(post.value?.sharedSavedMeal || post.value?.sharedWorkoutRoutine))
 const sharedAlreadySaved = computed(() => Boolean(post.value?.viewerSaveStatus?.saved))
+const isPostOwner = computed(() =>
+  Boolean(authStore.user?.id && post.value?.authorId && Number(authStore.user.id) === Number(post.value.authorId)),
+)
 const sharedSaveLabel = computed(() => {
   if (isSavingShared.value) return sharedAlreadySaved.value ? '삭제 중...' : '저장 중...'
   return sharedAlreadySaved.value ? '내 계정에서 삭제' : '내 계정에 저장'
@@ -135,6 +141,40 @@ async function submitPostEdit() {
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   }
+}
+
+async function removePost() {
+  formMessage.value = ''
+
+  if (!authStore.isAuthenticated || !isPostOwner.value) {
+    formMessage.value = '작성자만 게시글을 삭제할 수 있습니다.'
+    return
+  }
+
+  const postId = Number(route.params.id)
+
+  if (pendingDeletePostId.value !== postId) {
+    pendingDeletePostId.value = postId
+    formMessage.value = '게시글을 삭제하려면 같은 버튼을 한 번 더 눌러주세요.'
+    return
+  }
+
+  deletingPostId.value = postId
+
+  try {
+    await communityStore.removePost(postId)
+    toastStore.success('게시글 삭제 완료', '커뮤니티 게시글이 삭제되었습니다.')
+    router.push('/community')
+  } catch (error) {
+    formMessage.value = normalizeCaughtError(error).message
+  } finally {
+    deletingPostId.value = null
+  }
+}
+
+function cancelPostDelete() {
+  pendingDeletePostId.value = null
+  formMessage.value = ''
 }
 
 async function saveSharedToMine() {
@@ -391,7 +431,26 @@ onMounted(fetchPostDetail)
               >
                 {{ isLikeSubmitting ? '처리 중...' : post.isLiked ? '좋아요 취소' : '좋아요' }}
               </button>
-              <button class="btn btn-secondary" type="button" @click="startEditPost">수정</button>
+              <button v-if="isPostOwner" class="btn btn-secondary" type="button" @click="startEditPost">수정</button>
+              <button
+                v-if="isPostOwner"
+                class="btn btn-secondary"
+                type="button"
+                :class="{ 'is-danger': pendingDeletePostId === post.id }"
+                :disabled="deletingPostId === post.id"
+                @click="removePost"
+              >
+                {{
+                  deletingPostId === post.id
+                    ? '삭제 중...'
+                    : pendingDeletePostId === post.id
+                      ? '확인 삭제'
+                      : '삭제'
+                }}
+              </button>
+              <button v-if="pendingDeletePostId === post.id" class="btn btn-secondary" type="button" @click="cancelPostDelete">
+                취소
+              </button>
               <RouterLink v-if="post.authorId" class="btn btn-secondary" :to="`/users/${post.authorId}`">작성자 프로필</RouterLink>
               <RouterLink class="btn btn-secondary" to="/community">목록</RouterLink>
             </div>
@@ -441,7 +500,26 @@ onMounted(fetchPostDetail)
               >
                 {{ isLikeSubmitting ? '처리 중...' : post.isLiked ? '좋아요 취소' : '좋아요' }}
               </button>
-              <button class="btn btn-secondary" type="button" @click="startEditPost">수정</button>
+              <button v-if="isPostOwner" class="btn btn-secondary" type="button" @click="startEditPost">수정</button>
+              <button
+                v-if="isPostOwner"
+                class="btn btn-secondary"
+                type="button"
+                :class="{ 'is-danger': pendingDeletePostId === post.id }"
+                :disabled="deletingPostId === post.id"
+                @click="removePost"
+              >
+                {{
+                  deletingPostId === post.id
+                    ? '삭제 중...'
+                    : pendingDeletePostId === post.id
+                      ? '확인 삭제'
+                      : '삭제'
+                }}
+              </button>
+              <button v-if="pendingDeletePostId === post.id" class="btn btn-secondary" type="button" @click="cancelPostDelete">
+                취소
+              </button>
               <RouterLink v-if="post.authorId" class="btn btn-secondary" :to="`/users/${post.authorId}`">작성자 프로필</RouterLink>
               <RouterLink class="btn btn-secondary" to="/community">목록</RouterLink>
             </div>

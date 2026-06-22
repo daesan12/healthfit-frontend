@@ -383,7 +383,7 @@ onMounted(async () => {
   <main class="page-shell">
     <PageHeader
       eyebrow="Diet"
-      title="식단 기록"
+      title="하루 기록"
       description="날짜와 식사 순서를 기준으로 실제 섭취 음식을 기록하고 상세 항목을 관리합니다."
     />
 

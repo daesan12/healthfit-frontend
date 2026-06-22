@@ -34,6 +34,8 @@ const routineOptions = ref([])
 const isShareOptionsLoading = ref(false)
 const formMessage = ref('')
 const listErrorMessage = ref('')
+const deletingPostId = ref(null)
+const pendingDeletePostId = ref(null)
 
 const posts = computed(() => communityStore.posts)
 const pagination = computed(() => communityStore.pagination)
@@ -57,6 +59,10 @@ function sharedLabel(post) {
   if (post.sharedType === 'saved_meal') return `공유 식단 · ${post.sharedSavedMeal?.name || '저장 식단'}`
   if (post.sharedType === 'workout_routine') return `공유 루틴 · ${post.sharedWorkoutRoutine?.name || '운동 루틴'}`
   return ''
+}
+
+function isPostOwner(post) {
+  return Boolean(authStore.user?.id && post.authorId && Number(authStore.user.id) === Number(post.authorId))
 }
 
 function buildParams() {
@@ -164,6 +170,32 @@ async function createDraftPost() {
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   }
+}
+
+async function removePost(postId) {
+  listErrorMessage.value = ''
+
+  if (pendingDeletePostId.value !== postId) {
+    pendingDeletePostId.value = postId
+    return
+  }
+
+  deletingPostId.value = postId
+
+  try {
+    await communityStore.removePost(postId)
+    pendingDeletePostId.value = null
+    toastStore.success('게시글 삭제 완료', '커뮤니티 게시글이 삭제되었습니다.')
+    await fetchPosts()
+  } catch (error) {
+    listErrorMessage.value = normalizeCaughtError(error).message
+  } finally {
+    deletingPostId.value = null
+  }
+}
+
+function cancelPostDelete() {
+  pendingDeletePostId.value = null
 }
 
 watch(
@@ -303,9 +335,35 @@ onMounted(() => {
             <p class="meta-text">
               작성자 {{ post.author }} · 좋아요 {{ post.likes }} · 댓글 {{ post.comments }}
             </p>
-            <RouterLink class="btn btn-secondary card-action" :to="`/posts/${post.id}`">
-              상세 보기
-            </RouterLink>
+            <div class="button-row">
+              <RouterLink class="btn btn-secondary" :to="`/posts/${post.id}`">
+                상세 보기
+              </RouterLink>
+              <button
+                v-if="isPostOwner(post)"
+                class="btn btn-secondary"
+                type="button"
+                :class="{ 'is-danger': pendingDeletePostId === post.id }"
+                :disabled="deletingPostId === post.id"
+                @click="removePost(post.id)"
+              >
+                {{
+                  deletingPostId === post.id
+                    ? '삭제 중...'
+                    : pendingDeletePostId === post.id
+                      ? '확인 삭제'
+                      : '삭제'
+                }}
+              </button>
+              <button
+                v-if="pendingDeletePostId === post.id"
+                class="btn btn-secondary"
+                type="button"
+                @click="cancelPostDelete"
+              >
+                취소
+              </button>
+            </div>
           </article>
 
           <div v-if="posts.length > 0" class="surface-card pagination-panel" style="grid-column: 1 / -1">

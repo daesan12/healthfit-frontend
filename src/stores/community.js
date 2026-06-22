@@ -123,6 +123,17 @@ export const useCommunityStore = defineStore('community', () => {
     return data
   }
 
+  async function removePost(postId) {
+    await communityApi.deletePost(postId)
+    posts.value = posts.value.filter((post) => post.id !== Number(postId))
+    pagination.value.count = Math.max((pagination.value.count || 1) - 1, 0)
+
+    if (currentPost.value?.id === Number(postId)) {
+      currentPost.value = null
+      commentItems.value = []
+    }
+  }
+
   function findPost(postId) {
     const id = Number(postId)
 
@@ -207,6 +218,7 @@ export const useCommunityStore = defineStore('community', () => {
     fetchComments,
     addPost,
     editPost,
+    removePost,
     findPost,
     updatePostLike,
     toggleLike,

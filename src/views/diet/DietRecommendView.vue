@@ -1,76 +1,56 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
 import {
+  createSavedMeal,
   recommendDiet,
   replaceDietRecommendationFood,
   rerollDietRecommendation,
-  saveDietRecommendation,
 } from '@/api/diet'
 
 const targetDate = ref(new Date().toISOString().slice(0, 10))
 const mealCount = ref(3)
 const preference = ref('고단백, 조리 간단한 한식 식단')
-const detailLookupId = ref('')
-const saveTarget = ref('meal_plan')
-const saveTitle = ref('')
-const saveDescription = ref('')
 const recommendation = ref(null)
 const isLoading = ref(false)
-const isSaving = ref(false)
 const isReplacing = ref(false)
 const isRerolling = ref(false)
-const saveMessage = ref('')
 const requestMessage = ref('')
 const replaceMessage = ref('')
 const rerollMessage = ref('')
+const saveMessage = ref('')
+const isSavingSelected = ref(false)
 const selectedReplacement = ref(null)
-const replacementCondition = ref('비슷한 영양으로 다른 음식으로 바꿔줘')
+const replacementCondition = ref('비슷한 영양의 다른 음식으로 바꿔줘')
 const rerollCondition = ref('기존 조건은 유지하고 조리가 더 쉬운 구성으로 다시 추천해줘')
-
-const saveTargetOptions = computed(() => [
-  {
-    value: 'meals',
-    label: '식단 기록으로 저장',
-    description: '추천된 식사를 해당 날짜의 실제 식단 기록으로 저장합니다.',
-  },
-  {
-    value: 'saved_meal',
-    label: '저장 식단으로 저장',
-    description: '추천 한 끼를 저장 식단 템플릿으로 저장합니다.',
-  },
-  {
-    value: 'meal_plan',
-    label: '하루 식단 계획으로 저장',
-    description: '하루 추천 전체를 식단 계획 형태로 저장합니다.',
-  },
-  {
-    value: 'both',
-    label: '식단 기록과 계획 모두 저장',
-    description: '해당 날짜 식단 기록과 하루 식단 계획을 함께 만듭니다.',
-  },
-])
-
-const selectedSaveOption = computed(() => saveTargetOptions.value.find((option) => option.value === saveTarget.value))
+const saveForms = reactive({})
+const savingMealOrders = reactive({})
 
 function buildDietRecommendationMessage() {
-  const mealDescription = mealCount.value === 4 ? '아침, 점심, 저녁, 간식 4끼' : '아침, 점심, 저녁 3끼'
   const condition = preference.value.trim() || '균형 잡힌 건강 식단'
 
   return [
     'HealthFit 식단 추천 요청입니다.',
-    `${targetDate.value} 기준으로 ${mealDescription} 하루 식단을 추천해주세요.`,
-    `목표는 건강한 영양 구성, 적절한 칼로리, 충분한 단백질 섭취입니다.`,
+    `${targetDate.value} 기준으로 ${mealCount.value}끼 식단을 추천해주세요.`,
+    '목표는 건강한 영양 구성, 적절한 칼로리, 충분한 단백질 섭취입니다.',
     `사용자 선호 조건: ${condition}`,
   ].join(' ')
 }
 
-function resetSaveFields() {
-  saveTarget.value = 'meal_plan'
-  saveTitle.value = recommendation.value?.title || ''
-  saveDescription.value = preference.value
+function resetSaveForms() {
+  Object.keys(saveForms).forEach((key) => delete saveForms[key])
+  Object.keys(savingMealOrders).forEach((key) => delete savingMealOrders[key])
+
+  ;(recommendation.value?.meals || []).forEach((meal) => {
+    saveForms[meal.mealOrder] = {
+      shouldSave: false,
+      title: meal.mealType || `${meal.mealOrder}번째 식단`,
+      description: preference.value,
+      message: '',
+    }
+  })
 }
 
 function resetAiEditMessages() {
@@ -89,12 +69,12 @@ async function requestRecommendation() {
     recommendation.value = await recommendDiet({
       scope: 'day',
       target_date: targetDate.value,
-      meal_count: mealCount.value,
+      meal_count: Number(mealCount.value || 1),
       food_source: 'all',
       message: buildDietRecommendationMessage(),
       preference: preference.value,
     })
-    resetSaveFields()
+    resetSaveForms()
   } catch (error) {
     requestMessage.value = normalizeCaughtError(error).message
   } finally {
@@ -114,7 +94,7 @@ function startReplacement(meal, food) {
 
 function cancelReplacement() {
   selectedReplacement.value = null
-  replacementCondition.value = '비슷한 영양으로 다른 음식으로 바꿔줘'
+  replacementCondition.value = '비슷한 영양의 다른 음식으로 바꿔줘'
 }
 
 async function submitReplacement() {
@@ -122,13 +102,12 @@ async function submitReplacement() {
 
   const food = selectedReplacement.value.food
   if (!food.foodId && !food.aiFoodKey) {
-    replaceMessage.value = '교체할 음식 식별자를 찾을 수 없습니다.'
+    replaceMessage.value = '교체할 음식 정보를 찾을 수 없습니다.'
     return
   }
 
   isReplacing.value = true
   replaceMessage.value = ''
-  saveMessage.value = ''
 
   try {
     recommendation.value = await replaceDietRecommendationFood(recommendation.value.id, {
@@ -137,9 +116,9 @@ async function submitReplacement() {
       replaceAiFoodKey: food.aiFoodKey,
       message: replacementCondition.value.trim(),
     })
-    resetSaveFields()
+    resetSaveForms()
     cancelReplacement()
-    replaceMessage.value = '선택한 음식을 교체한 새 추천을 생성했습니다.'
+    replaceMessage.value = '선택한 음식을 교체한 추천을 생성했습니다.'
   } catch (error) {
     replaceMessage.value = normalizeCaughtError(error).message
   } finally {
@@ -160,14 +139,13 @@ async function submitReroll() {
 
   isRerolling.value = true
   rerollMessage.value = ''
-  saveMessage.value = ''
   selectedReplacement.value = null
 
   try {
     recommendation.value = await rerollDietRecommendation(recommendation.value.id, {
       message: rerollCondition.value.trim(),
     })
-    resetSaveFields()
+    resetSaveForms()
     rerollMessage.value = '기존 조건을 기반으로 새 추천을 생성했습니다.'
   } catch (error) {
     rerollMessage.value = normalizeCaughtError(error).message
@@ -176,36 +154,67 @@ async function submitReroll() {
   }
 }
 
-async function saveRecommendation() {
-  if (!recommendation.value?.id) {
-    saveMessage.value = '먼저 AI 추천을 생성해주세요.'
-    return
-  }
-
-  if (!saveTarget.value) {
-    saveMessage.value = '저장 대상을 선택해주세요.'
-    return
-  }
-
-  isSaving.value = true
+async function saveSelectedMeals() {
   saveMessage.value = ''
 
+  const selectedMeals = (recommendation.value?.meals || []).filter((meal) => saveForms[meal.mealOrder]?.shouldSave)
+  if (!selectedMeals.length) {
+    saveMessage.value = '저장할 식사를 체크해주세요.'
+    return
+  }
+
+  isSavingSelected.value = true
+  let savedCount = 0
+
   try {
-    await saveDietRecommendation(recommendation.value.id, {
-      save_target: saveTarget.value,
-      title: saveTitle.value.trim() || recommendation.value.title,
-      description: saveDescription.value.trim(),
-    })
-    saveMessage.value = `${selectedSaveOption.value?.label || '추천 식단 저장'}을 완료했습니다.`
-  } catch (error) {
-    saveMessage.value = normalizeCaughtError(error).message
+    for (const meal of selectedMeals) {
+      const saved = await saveMealAsSavedMeal(meal)
+      if (saved) savedCount += 1
+    }
+    saveMessage.value = `${savedCount}개 식사를 저장 식단으로 저장했습니다.`
   } finally {
-    isSaving.value = false
+    isSavingSelected.value = false
+  }
+}
+
+async function saveMealAsSavedMeal(meal) {
+  const form = saveForms[meal.mealOrder]
+  if (!form) return
+
+  form.message = ''
+  const items = meal.foods
+    .filter((food) => food.foodId)
+    .map((food) => ({
+      foodId: food.foodId,
+      amount: food.amount,
+    }))
+
+  if (!items.length) {
+    form.message = '저장 가능한 DB 음식이 없습니다.'
+    return false
+  }
+
+  savingMealOrders[meal.mealOrder] = true
+
+  try {
+    await createSavedMeal({
+      name: form.title.trim() || meal.mealType || `${meal.mealOrder}번째 식단`,
+      description: form.description.trim(),
+      items,
+    })
+    form.shouldSave = true
+    form.message = '저장 식단으로 저장했습니다.'
+    return true
+  } catch (error) {
+    form.message = normalizeCaughtError(error).message
+    return false
+  } finally {
+    savingMealOrders[meal.mealOrder] = false
   }
 }
 
 watch(recommendation, (nextRecommendation) => {
-  if (nextRecommendation) resetSaveFields()
+  if (nextRecommendation) resetSaveForms()
 })
 </script>
 
@@ -214,7 +223,7 @@ watch(recommendation, (nextRecommendation) => {
     <PageHeader
       eyebrow="Diet AI"
       title="AI 식단 추천"
-      description="하루 식단을 추천받고, 음식 교체나 기존 조건 재추천 후 원하는 방식으로 저장합니다."
+      description="원하는 끼니 수만큼 추천받고, 필요한 끼니만 저장 식단으로 저장합니다."
     />
 
     <section class="content-grid">
@@ -225,10 +234,9 @@ watch(recommendation, (nextRecommendation) => {
         </div>
 
         <div class="field-group">
-          <label for="meal-count">식사 구성</label>
+          <label for="meal-count">추천받을 끼니 수</label>
           <select id="meal-count" v-model.number="mealCount">
-            <option :value="3">아침, 점심, 저녁</option>
-            <option :value="4">아침, 점심, 저녁, 간식</option>
+            <option v-for="count in 6" :key="count" :value="count">{{ count }}끼</option>
           </select>
         </div>
 
@@ -240,19 +248,6 @@ watch(recommendation, (nextRecommendation) => {
         <button class="btn btn-primary" type="submit" :disabled="isLoading">
           {{ isLoading ? '추천 생성 중...' : 'AI 추천 받기' }}
         </button>
-
-        <div class="field-group">
-          <label for="recommendation-id">추천 ID로 상세 조회</label>
-          <input id="recommendation-id" v-model="detailLookupId" type="number" min="1" placeholder="예: 12" />
-        </div>
-        <RouterLink
-          class="btn btn-secondary"
-          :class="{ disabled: !detailLookupId }"
-          :to="detailLookupId ? `/diet/recommendations/${detailLookupId}` : '/diet/recommend'"
-        >
-          추천 상세 열기
-        </RouterLink>
-
       </form>
 
       <section class="surface-card recommendation-panel" style="grid-column: span 8">
@@ -281,16 +276,14 @@ watch(recommendation, (nextRecommendation) => {
               <p class="section-label">Recommendation</p>
               <h2>{{ recommendation.title }}</h2>
             </div>
-            <RouterLink class="btn btn-secondary" :to="`/diet/recommendations/${recommendation.id}`">
-              상세 페이지
-            </RouterLink>
+            <span class="chip">{{ recommendation.meals.length }}끼</span>
           </div>
 
           <div class="save-options-panel">
             <div class="field-group">
               <label for="reroll-condition">기존 조건 기반 재추천</label>
               <textarea id="reroll-condition" v-model="rerollCondition" />
-              <span class="meta-text">현재 추천의 scope, 날짜, 음식 소스, 끼니 수를 유지하고 조건만 추가합니다.</span>
+              <span class="meta-text">현재 추천의 기준 조건은 유지하고 추가 조건만 반영합니다.</span>
             </div>
             <button class="btn btn-secondary" type="button" :disabled="isRerolling" @click="submitReroll">
               {{ isRerolling ? '재추천 중...' : '기존 조건으로 다시 추천' }}
@@ -318,39 +311,6 @@ watch(recommendation, (nextRecommendation) => {
           </div>
 
           <p v-if="replaceMessage" class="form-message">{{ replaceMessage }}</p>
-
-          <div class="save-options-panel">
-            <div class="field-group">
-              <label for="save-target">저장 대상</label>
-              <select id="save-target" v-model="saveTarget">
-                <option v-for="option in saveTargetOptions" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
-              <span class="meta-text">{{ selectedSaveOption?.description }}</span>
-            </div>
-
-            <div class="field-group">
-              <label for="save-title">저장 제목</label>
-              <input id="save-title" v-model="saveTitle" type="text" />
-            </div>
-
-            <div class="field-group">
-              <label for="save-description">저장 설명</label>
-              <textarea id="save-description" v-model="saveDescription" />
-            </div>
-
-            <button class="btn btn-secondary" type="button" :disabled="isSaving" @click="saveRecommendation">
-              {{ isSaving ? '저장 중...' : '선택한 방식으로 저장' }}
-            </button>
-          </div>
-
-          <p v-if="saveMessage" class="form-message">{{ saveMessage }}</p>
-          <div v-if="saveMessage" class="button-row">
-            <RouterLink class="btn btn-secondary" to="/saved-meals">저장 식단 보기</RouterLink>
-            <RouterLink class="btn btn-secondary" to="/diet/records">식단 기록으로 이동</RouterLink>
-            <RouterLink class="btn btn-secondary" to="/community">커뮤니티에 공유</RouterLink>
-          </div>
           <p class="card-description">{{ recommendation.reason }}</p>
 
           <div class="totals-panel recommendation-totals">
@@ -374,7 +334,17 @@ watch(recommendation, (nextRecommendation) => {
 
           <div class="recommendation-meals">
             <article v-for="meal in recommendation.meals" :key="meal.mealOrder" class="meal-plan-card">
-              <h3>{{ meal.mealType }}</h3>
+              <div class="section-heading-row">
+                <div>
+                  <p class="section-label">{{ meal.mealOrder }}번째</p>
+                  <h3>{{ meal.mealType }}</h3>
+                </div>
+                <label class="chip">
+                  <input v-model="saveForms[meal.mealOrder].shouldSave" type="checkbox" />
+                  저장
+                </label>
+              </div>
+
               <ul>
                 <li v-for="food in meal.foods" :key="`${meal.mealOrder}-${food.foodId || food.aiFoodKey || food.name}`">
                   <span>{{ food.name }} {{ food.amount }}g</span>
@@ -384,7 +354,35 @@ watch(recommendation, (nextRecommendation) => {
                   </button>
                 </li>
               </ul>
+
+              <div v-if="saveForms[meal.mealOrder]?.shouldSave" class="save-options-panel">
+                <div class="field-group">
+                  <label :for="`save-title-${meal.mealOrder}`">저장 식단 이름</label>
+                  <input :id="`save-title-${meal.mealOrder}`" v-model="saveForms[meal.mealOrder].title" type="text" />
+                </div>
+                <div class="field-group">
+                  <label :for="`save-description-${meal.mealOrder}`">설명</label>
+                  <textarea :id="`save-description-${meal.mealOrder}`" v-model="saveForms[meal.mealOrder].description" />
+                </div>
+                <p v-if="saveForms[meal.mealOrder].message" class="form-message">
+                  {{ saveForms[meal.mealOrder].message }}
+                </p>
+              </div>
             </article>
+          </div>
+
+          <div class="save-options-panel">
+            <p class="section-label">선택한 식사 저장</p>
+            <p class="meta-text">체크한 식사들을 한 번에 저장 식단 목록에 추가합니다.</p>
+            <button class="btn btn-primary" type="button" :disabled="isSavingSelected" @click="saveSelectedMeals">
+              {{ isSavingSelected ? '저장 중...' : '선택한 식사 저장' }}
+            </button>
+            <p v-if="saveMessage" class="form-message">{{ saveMessage }}</p>
+          </div>
+
+          <div class="button-row">
+            <RouterLink class="btn btn-secondary" to="/saved-meals">저장 식단 보기</RouterLink>
+            <RouterLink class="btn btn-secondary" to="/community">커뮤니티에 공유</RouterLink>
           </div>
         </template>
 

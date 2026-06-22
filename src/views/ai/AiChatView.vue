@@ -35,17 +35,64 @@ function syncPagination(data) {
   pagination.hasPrevious = data.hasPrevious
 }
 
+function actionCardsFor(text) {
+  const source = String(text || '').toLowerCase()
+  const actions = []
+
+  if (source.includes('식단') || source.includes('영양') || source.includes('단백') || source.includes('칼로리') || source.includes('diet')) {
+    actions.push({ label: '식단 추천 받기', to: '/diet/recommend' })
+    actions.push({ label: '오늘 식단 평가', to: '/diet/evaluation' })
+    actions.push({ label: '식단 기록하기', to: '/diet/records' })
+  }
+
+  if (source.includes('운동') || source.includes('루틴') || source.includes('중량') || source.includes('workout') || source.includes('exercise')) {
+    actions.push({ label: '운동 루틴 추천', to: '/workout/recommend' })
+    actions.push({ label: '진행 추천 받기', to: '/workout/progression' })
+    actions.push({ label: '운동 기록하기', to: '/workout/logs' })
+  }
+
+  return actions.filter((action, index, list) => list.findIndex((item) => item.to === action.to) === index)
+}
+
+function isGuardrailBlocked(message) {
+  const source = String(message || '').toLowerCase()
+  return (
+    source.includes('blocked') ||
+    source.includes('guardrail') ||
+    source.includes('policy') ||
+    source.includes('unsafe') ||
+    source.includes('유해') ||
+    source.includes('부적절')
+  )
+}
+
+function friendlyAiErrorMessage(message) {
+  if (isGuardrailBlocked(message)) {
+    return [
+      '이 질문은 안전 기준에 걸려서 답변할 수 없습니다.',
+      'HealthFit에서는 식단, 운동, 영양, 건강한 습관과 관련된 질문만 도와드릴 수 있어요.',
+      '예: "다이어트 식단 작성해줘", "무릎 부담 적은 운동 추천해줘"처럼 다시 질문해보세요.',
+    ].join('\n')
+  }
+
+  return 'AI 답변을 가져오지 못했습니다. 잠시 후 다시 질문해보세요.'
+}
+
 function toChatItems(apiChat) {
+  const combinedText = `${apiChat.question || ''}\n${apiChat.answer || ''}`
+
   return [
     {
       id: `${apiChat.id}-q`,
       role: 'user',
       message: apiChat.question,
+      actions: [],
     },
     {
       id: `${apiChat.id}-a`,
       role: 'assistant',
       message: apiChat.answer,
+      actions: actionCardsFor(combinedText),
     },
   ]
 }
@@ -55,7 +102,10 @@ async function loadChats(page = pagination.page) {
 
   try {
     const data = await getAiChatsPage({ page, page_size: pagination.pageSize })
-    chats.value = data.results.flatMap(toChatItems).reverse()
+    chats.value = data.results
+      .slice()
+      .reverse()
+      .flatMap(toChatItems)
     syncPagination(data)
   } catch (error) {
     errorMessage.value = normalizeCaughtError(error).message
@@ -75,6 +125,7 @@ async function askQuestion() {
     id: `pending-${Date.now()}`,
     role: 'user',
     message: currentQuestion,
+    actions: [],
   })
   question.value = ''
   isLoading.value = true
@@ -84,7 +135,17 @@ async function askQuestion() {
     chats.value.push(...toChatItems(answer).slice(1))
     await loadChats(1)
   } catch (error) {
-    errorMessage.value = normalizeCaughtError(error).message
+    const apiError = normalizeCaughtError(error)
+    chats.value.push({
+      id: `error-${Date.now()}`,
+      role: 'assistant',
+      message: friendlyAiErrorMessage(apiError.message),
+      actions: [
+        { label: '식단 추천 받기', to: '/diet/recommend' },
+        { label: '운동 루틴 추천', to: '/workout/recommend' },
+        { label: '진행 현황 보기', to: '/progress' },
+      ],
+    })
   } finally {
     isLoading.value = false
   }
@@ -97,8 +158,8 @@ onMounted(() => loadChats(1))
   <main class="page-shell">
     <PageHeader
       eyebrow="AI Chat"
-      title="AI 질문 응답"
-      description="식단, 운동, 영양 정보를 HealthFit AI에게 질문합니다."
+      title="AI 질문 답변"
+      description="식단, 운동, 영양 질문을 HealthFit PT 코치에게 물어보고 관련 기록 화면으로 이어갑니다."
     />
 
     <section class="content-grid">
@@ -119,6 +180,12 @@ onMounted(() => loadChats(1))
         >
           <span>{{ chat.role === 'user' ? '나' : 'HealthFit AI' }}</span>
           <p>{{ chat.message }}</p>
+
+          <div v-if="chat.actions.length" class="button-row routine-quick-actions">
+            <RouterLink v-for="action in chat.actions" :key="action.to" class="btn btn-secondary" :to="action.to">
+              {{ action.label }}
+            </RouterLink>
+          </div>
         </article>
 
         <div v-if="pagination.totalPages > 1" class="pagination-panel">
@@ -134,8 +201,8 @@ onMounted(() => loadChats(1))
         <StateBlock
           v-if="isLoading"
           type="loading"
-          title="AI 응답을 준비하는 중입니다"
-          message="서버에서 답변을 생성하고 있습니다."
+          title="AI 답변 준비 중"
+          message="서버에서 PT 코치 답변을 생성하고 있습니다."
         />
 
         <StateBlock
@@ -146,7 +213,12 @@ onMounted(() => loadChats(1))
         />
       </section>
 
-      <form class="form-card" style="grid-column: span 4" @submit.prevent="askQuestion">
+      <form class="form-card" style="grid-column: span 4; align-self: start" @submit.prevent="askQuestion">
+        <div class="ai-status-banner">
+          <span class="status-badge">PT Coach</span>
+          <p>백엔드 가드레일과 최근 대화 기록을 기반으로 답변합니다.</p>
+        </div>
+
         <div class="field-group">
           <label for="question">질문</label>
           <textarea id="question" v-model="question" />
@@ -160,7 +232,7 @@ onMounted(() => loadChats(1))
         />
 
         <button class="btn btn-primary" type="submit" :disabled="isLoading">
-          {{ isLoading ? '응답 대기 중...' : 'AI에게 질문하기' }}
+          {{ isLoading ? '답변 대기 중...' : 'AI에게 질문하기' }}
         </button>
       </form>
     </section>

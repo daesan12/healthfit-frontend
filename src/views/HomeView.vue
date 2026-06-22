@@ -12,9 +12,8 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 
 const highlights = [
-  { value: '2,322', label: '정제 음식 데이터' },
+  { value: '2,322', label: '음식 데이터' },
   { value: '415', label: '운동 데이터' },
-  { value: '25', label: '핵심 요구사항' },
 ]
 
 const todayCards = computed(() => [
@@ -37,17 +36,11 @@ const todayCards = computed(() => [
     value: formatWeightChange(progress.value?.bodySummary.weightChange),
     hint: progress.value?.bodySummary.latestWeight
       ? `최근 ${progress.value.bodySummary.latestWeight}kg`
-      : '오늘 신체 기록을 남겨보세요',
+      : '오늘 신체 기록을 남겨보세요.',
     to: '/body-records',
     action: '신체 기록',
   },
 ])
-
-const quickActions = [
-  { title: '기록 허브', text: '식단, 운동, 신체 기록을 한 곳에서 시작합니다.', to: '/records' },
-  { title: '진행 현황', text: '기록한 데이터를 기간별로 확인합니다.', to: '/progress' },
-  { title: 'AI 상담', text: 'AI 기능은 백엔드 구현 후 최종 연동합니다.', to: '/ai-chat' },
-]
 
 function formatWeightChange(value) {
   if (value === null || value === undefined) return '기록 없음'
@@ -68,8 +61,7 @@ async function fetchTodayProgress() {
       end_date: today,
     })
   } catch (error) {
-    const apiError = normalizeCaughtError(error)
-    errorMessage.value = apiError.message
+    errorMessage.value = normalizeCaughtError(error).message
   } finally {
     isLoading.value = false
   }
@@ -83,9 +75,9 @@ onMounted(fetchTodayProgress)
     <section class="hero-section home-dashboard-hero">
       <div class="hero-copy">
         <p class="section-label">AI 맞춤 식단·운동 추천 서비스</p>
-        <h1>오늘의 기록이 내일의 루틴이 되는 HealthFit</h1>
+        <h1>오늘의 기록으로 내일의 루틴을 만드는 HealthFit</h1>
         <p class="hero-description">
-          식단, 운동, 신체 기록을 한 곳에 모으고 진행 현황에서 변화를 확인하는 건강 관리 플랫폼입니다.
+          식단, 운동, 신체 기록을 한곳에 모으고 진행 현황에서 변화를 확인하는 건강 관리 플랫폼입니다.
         </p>
 
         <div class="hero-actions">
@@ -146,11 +138,5 @@ onMounted(fetchTodayProgress)
       </article>
     </section>
 
-    <section class="feature-grid" aria-label="Quick actions">
-      <RouterLink v-for="action in quickActions" :key="action.title" :to="action.to">
-        <h2>{{ action.title }}</h2>
-        <p>{{ action.text }}</p>
-      </RouterLink>
-    </section>
   </main>
 </template>

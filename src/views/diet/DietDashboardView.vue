@@ -155,8 +155,8 @@ onMounted(fetchDashboard)
       <aside class="surface-card" style="grid-column: span 4">
         <p class="section-label">빠른 이동</p>
         <div class="button-row">
-          <RouterLink class="btn btn-secondary" to="/foods">음식 검색</RouterLink>
-          <RouterLink class="btn btn-primary" to="/diet/records">식단 기록</RouterLink>
+          <!-- <RouterLink class="btn btn-secondary" to="/foods">음식 검색</RouterLink> -->
+          <!-- <RouterLink class="btn btn-primary" to="/diet/records">식단 기록</RouterLink> -->
           <RouterLink class="btn btn-secondary" to="/diet/recommend">AI 추천</RouterLink>
           <RouterLink class="btn btn-secondary" to="/diet/evaluation">오늘 평가</RouterLink>
         </div>

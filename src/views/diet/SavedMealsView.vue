@@ -15,6 +15,7 @@ import {
 const savedMeals = ref([])
 const foods = ref([])
 const search = ref('')
+const foodSearch = ref('')
 const isLoading = ref(false)
 const message = ref('')
 const errorMessage = ref('')
@@ -95,7 +96,7 @@ async function fetchSavedMeals(page = 1) {
 }
 
 async function fetchFoods() {
-  foods.value = await getFoods({ page_size: 100 })
+  foods.value = await getFoods(foodSearch.value.trim() ? { search: foodSearch.value.trim(), page_size: 100 } : { page_size: 100 })
 }
 
 function addItemToForm() {
@@ -225,7 +226,7 @@ onMounted(() => {
     />
 
     <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4" @submit.prevent="submitSavedMeal">
+      <form class="form-card" style="grid-column: span 4; align-self: start" @submit.prevent="submitSavedMeal">
         <p class="section-label">{{ editingSavedMealId ? 'Edit Saved Meal' : 'New Saved Meal' }}</p>
         <div class="field-group">
           <label for="saved-meal-name">이름</label>
@@ -237,6 +238,10 @@ onMounted(() => {
         </div>
         <div class="field-group">
           <label for="saved-meal-food">음식</label>
+          <div class="inline-controls" style="margin-bottom: 0.5rem">
+            <input id="saved-meal-food-search" v-model="foodSearch" type="text" placeholder="음식 이름 검색" />
+            <button class="btn btn-secondary" type="button" @click="fetchFoods">검색</button>
+          </div>
           <select id="saved-meal-food" v-model="form.foodId">
             <option value="">선택</option>
             <option v-for="food in foods" :key="food.id" :value="food.id">{{ food.name }}</option>
@@ -302,8 +307,13 @@ onMounted(() => {
       <section class="post-list" style="grid-column: span 8">
         <form class="surface-card filter-panel" @submit.prevent="fetchSavedMeals(1)">
           <div class="field-group">
-            <label for="saved-meal-search">검색</label>
-            <input id="saved-meal-search" v-model="search" type="text" />
+            <label for="saved-meal-search">저장 식단 목록 검색</label>
+            <input
+              id="saved-meal-search"
+              v-model="search"
+              type="text"
+              placeholder="저장 식단 이름 또는 설명 검색"
+            />
           </div>
           <button class="btn btn-primary" type="submit" :disabled="isLoading">조회</button>
         </form>

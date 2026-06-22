@@ -191,7 +191,7 @@ onMounted(() => {
     />
 
     <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4" @submit.prevent="createDraftPost">
+      <form class="form-card" style="grid-column: span 4; align-self: start" @submit.prevent="createDraftPost">
         <div class="field-group">
           <label for="post-title">제목</label>
           <input id="post-title" v-model="draftPost.title" type="text" placeholder="오늘의 식단 공유" />

@@ -5,6 +5,8 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
 import { saveSharedMeal, saveSharedRoutine } from '@/api/community'
+import { deleteSavedMeal } from '@/api/diet'
+import { deleteWorkoutRoutine } from '@/api/workout'
 import { useAuthStore } from '@/stores/auth'
 import { useCommunityStore } from '@/stores/community'
 import { useToastStore } from '@/stores/toast'
@@ -13,6 +15,7 @@ const route = useRoute()
 const authStore = useAuthStore()
 const communityStore = useCommunityStore()
 const toastStore = useToastStore()
+
 const newComment = ref('')
 const formMessage = ref('')
 const errorMessage = ref('')
@@ -30,6 +33,10 @@ const comments = computed(() => communityStore.commentItems)
 const commentPagination = computed(() => communityStore.commentPagination)
 const hasSharedSnapshot = computed(() => Boolean(post.value?.sharedSavedMeal || post.value?.sharedWorkoutRoutine))
 const sharedAlreadySaved = computed(() => Boolean(post.value?.viewerSaveStatus?.saved))
+const sharedSaveLabel = computed(() => {
+  if (isSavingShared.value) return sharedAlreadySaved.value ? '삭제 중...' : '저장 중...'
+  return sharedAlreadySaved.value ? '내 계정에서 삭제' : '내 계정에 저장'
+})
 const commentSummary = computed(() => {
   if (!commentPagination.value.count) return '댓글 0개'
   const start = (commentPagination.value.page - 1) * commentPagination.value.pageSize + 1
@@ -55,6 +62,11 @@ function categoryLabel(value) {
 
 function itemName(item) {
   return item.food_name || item.foodName || item.name || item.exercise_name || item.exercise?.name || '항목'
+}
+
+function formatDate(value) {
+  if (!value) return ''
+  return String(value).slice(0, 10)
 }
 
 async function fetchPost() {
@@ -118,7 +130,7 @@ async function submitPostEdit() {
       content: postForm.content.trim(),
     })
     isPostEditing.value = false
-    formMessage.value = '게시글을 수정했습니다.'
+    formMessage.value = '게시글이 수정되었습니다.'
     toastStore.success('게시글 수정 완료', '커뮤니티 게시글 내용이 변경되었습니다.')
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
@@ -138,13 +150,29 @@ async function saveSharedToMine() {
   isSavingShared.value = true
 
   try {
-    const result =
-      post.value.sharedType === 'saved_meal'
-        ? await saveSharedMeal(route.params.id)
-        : await saveSharedRoutine(route.params.id)
+    if (sharedAlreadySaved.value) {
+      const savedMealId = post.value.viewerSaveStatus?.saved_meal_id
+      const routineId = post.value.viewerSaveStatus?.workout_routine_id
+
+      if (post.value.sharedType === 'saved_meal' && savedMealId) {
+        await deleteSavedMeal(savedMealId)
+      } else if (post.value.sharedType === 'workout_routine' && routineId) {
+        await deleteWorkoutRoutine(routineId)
+      }
+
+      await fetchPost()
+      formMessage.value = '내 계정에 저장된 공유 항목을 삭제했습니다.'
+      toastStore.success('저장 항목 삭제 완료', '내 계정 목록에서도 삭제되었습니다.')
+      return
+    }
+
+    await (post.value.sharedType === 'saved_meal'
+      ? saveSharedMeal(route.params.id)
+      : saveSharedRoutine(route.params.id))
+
     await fetchPost()
-    formMessage.value = result.already_saved ? '이미 내 계정에 저장된 항목입니다.' : '공유 항목을 내 계정에 저장했습니다.'
-    toastStore.success('공유 항목 저장 완료', '내 식단/루틴 목록에서 확인할 수 있습니다.')
+    formMessage.value = '공유 항목을 내 계정에 저장했습니다.'
+    toastStore.success('공유 항목 저장 완료', '저장 식단/루틴 목록에서 확인할 수 있습니다.')
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   } finally {
@@ -174,8 +202,8 @@ async function addComment() {
     pendingDeleteCommentId.value = null
     const lastPage = Math.max(1, Math.ceil(commentPagination.value.count / commentPagination.value.pageSize))
     await fetchComments(lastPage)
-    formMessage.value = '댓글을 작성했습니다.'
-    toastStore.success('댓글 작성 완료', '게시글에 댓글을 추가했습니다.')
+    formMessage.value = '댓글이 작성되었습니다.'
+    toastStore.success('댓글 작성 완료', '게시글에 댓글이 추가되었습니다.')
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   } finally {
@@ -213,7 +241,7 @@ async function submitCommentEdit(commentId) {
     await communityStore.editComment(commentId, content)
     await fetchComments(commentPagination.value.page)
     cancelEditComment()
-    formMessage.value = '댓글을 수정했습니다.'
+    formMessage.value = '댓글이 수정되었습니다.'
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   }
@@ -243,7 +271,7 @@ async function removeComment(commentId) {
       ? commentPagination.value.page - 1
       : commentPagination.value.page
     await fetchComments(nextPage)
-    formMessage.value = '댓글을 삭제했습니다.'
+    formMessage.value = '댓글이 삭제되었습니다.'
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   } finally {
@@ -302,7 +330,7 @@ onMounted(fetchPostDetail)
       />
 
       <section class="content-grid">
-        <article class="surface-card" style="grid-column: span 8">
+        <article class="surface-card" style="grid-column: span 12">
           <template v-if="isPostEditing">
             <form class="stacked-form" @submit.prevent="submitPostEdit">
               <div class="field-group">
@@ -338,41 +366,35 @@ onMounted(fetchPostDetail)
           </template>
         </article>
 
-        <aside class="surface-card" style="grid-column: span 4">
-          <p class="section-label">Actions</p>
-          <div class="button-row">
-            <button
-              class="btn"
-              :class="post.isLiked ? 'btn-primary' : 'btn-secondary'"
-              type="button"
-              :disabled="isLikeSubmitting"
-              @click="toggleLike"
-            >
-              {{ isLikeSubmitting ? '처리 중...' : post.isLiked ? '좋아요 취소' : '좋아요' }}
-            </button>
-            <button class="btn btn-secondary" type="button" @click="startEditPost">수정</button>
-            <RouterLink v-if="post.authorId" class="btn btn-secondary" :to="`/users/${post.authorId}`">작성자 프로필</RouterLink>
-            <RouterLink class="btn btn-secondary" to="/community">목록</RouterLink>
-          </div>
-          <p v-if="!authStore.isAuthenticated" class="meta-text">
-            로그인하면 좋아요, 게시글 수정, 댓글 작성이 가능합니다.
-          </p>
-        </aside>
-
-        <section v-if="hasSharedSnapshot" class="surface-card" style="grid-column: span 8">
+        <section v-if="hasSharedSnapshot" class="surface-card" style="grid-column: span 12">
           <div class="section-heading-row">
             <div>
               <p class="section-label">Shared Snapshot</p>
               <h2>{{ post.sharedSavedMeal?.name || post.sharedWorkoutRoutine?.name }}</h2>
             </div>
-            <button
-              class="btn btn-primary"
-              type="button"
-              :disabled="isSavingShared || sharedAlreadySaved"
-              @click="saveSharedToMine"
-            >
-              {{ sharedAlreadySaved ? '저장됨' : isSavingShared ? '저장 중...' : '내 계정에 저장' }}
-            </button>
+            <div class="button-row">
+              <button
+                class="btn"
+                :class="sharedAlreadySaved ? 'btn-secondary' : 'btn-primary'"
+                type="button"
+                :disabled="isSavingShared"
+                @click="saveSharedToMine"
+              >
+                {{ sharedSaveLabel }}
+              </button>
+              <button
+                class="btn"
+                :class="post.isLiked ? 'btn-primary' : 'btn-secondary'"
+                type="button"
+                :disabled="isLikeSubmitting"
+                @click="toggleLike"
+              >
+                {{ isLikeSubmitting ? '처리 중...' : post.isLiked ? '좋아요 취소' : '좋아요' }}
+              </button>
+              <button class="btn btn-secondary" type="button" @click="startEditPost">수정</button>
+              <RouterLink v-if="post.authorId" class="btn btn-secondary" :to="`/users/${post.authorId}`">작성자 프로필</RouterLink>
+              <RouterLink class="btn btn-secondary" to="/community">목록</RouterLink>
+            </div>
           </div>
 
           <template v-if="post.sharedSavedMeal">
@@ -403,7 +425,30 @@ onMounted(fetchPostDetail)
           </template>
         </section>
 
-        <section class="surface-card comments-panel" style="grid-column: span 8">
+        <section v-else class="surface-card" style="grid-column: span 12">
+          <div class="section-heading-row">
+            <div>
+              <p class="section-label">Actions</p>
+              <h2>게시글 작업</h2>
+            </div>
+            <div class="button-row">
+              <button
+                class="btn"
+                :class="post.isLiked ? 'btn-primary' : 'btn-secondary'"
+                type="button"
+                :disabled="isLikeSubmitting"
+                @click="toggleLike"
+              >
+                {{ isLikeSubmitting ? '처리 중...' : post.isLiked ? '좋아요 취소' : '좋아요' }}
+              </button>
+              <button class="btn btn-secondary" type="button" @click="startEditPost">수정</button>
+              <RouterLink v-if="post.authorId" class="btn btn-secondary" :to="`/users/${post.authorId}`">작성자 프로필</RouterLink>
+              <RouterLink class="btn btn-secondary" to="/community">목록</RouterLink>
+            </div>
+          </div>
+        </section>
+
+        <section class="surface-card comments-panel" style="grid-column: span 12">
           <div class="section-heading-row">
             <div>
               <p class="section-label">댓글</p>
@@ -424,13 +469,13 @@ onMounted(fetchPostDetail)
             v-if="communityStore.isCommentsLoading && comments.length === 0"
             type="loading"
             title="댓글을 불러오는 중입니다"
-            message="댓글 목록 페이지를 조회하고 있습니다."
+            message="댓글 목록을 조회하고 있습니다."
           />
 
           <article v-for="comment in comments" v-else :key="comment.id" class="comment-item">
             <div>
               <strong>{{ comment.author }}</strong>
-              <span>{{ comment.createdAt }}</span>
+              <span>{{ formatDate(comment.createdAt) }}</span>
               <form v-if="editingCommentId === comment.id" class="stacked-form" @submit.prevent="submitCommentEdit(comment.id)">
                 <textarea v-model="editingCommentContent" />
                 <div class="button-row">
@@ -483,15 +528,6 @@ onMounted(fetchPostDetail)
               다음
             </button>
           </div>
-
-          <StateBlock
-            v-if="!communityStore.isCommentsLoading && comments.length === 0"
-            type="empty"
-            title="댓글이 없습니다"
-            message="첫 댓글로 대화를 시작해보세요."
-          >
-            <a class="btn btn-primary" href="#comment-input">댓글 작성하기</a>
-          </StateBlock>
         </section>
       </section>
     </template>

@@ -19,6 +19,7 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 
 const bodyRecords = computed(() => progress.value?.bodySummary.recentRecords || [])
+const chartRows = computed(() => progress.value?.chartData || [])
 
 const dailyRows = computed(() => {
   const mealDaily = progress.value?.mealSummary.daily || []
@@ -33,6 +34,7 @@ const dailyRows = computed(() => {
       date,
       calories: Number(meal.total_calories || 0),
       protein: Number(meal.total_protein || 0),
+      mealScore: meal.meal_score ?? null,
       workoutCount: Number(workout.workout_count || 0),
       workoutTime: Number(workout.total_workout_time || 0),
     }
@@ -177,7 +179,7 @@ onMounted(fetchProgress)
       <button class="btn btn-primary" type="submit" :disabled="isLoading">
         {{ isLoading ? '조회 중...' : '조회' }}
       </button>
-      <RouterLink class="btn btn-secondary" to="/body-records">신체 기록</RouterLink>
+      <!-- <RouterLink class="btn btn-secondary" to="/body-records">신체 기록</RouterLink> -->
       <RouterLink class="btn btn-secondary" to="/workout/logs">운동 기록</RouterLink>
     </form>
 
@@ -300,6 +302,7 @@ onMounted(fetchProgress)
           <article v-for="item in dailyRows" :key="item.date" class="meal-item">
             <div>
               <strong>{{ item.date }}</strong>
+              <span v-if="item.mealScore !== null">식단 점수 {{ item.mealScore }}점</span>
               <span>섭취 {{ formatNumber(item.calories, 0) }} kcal · 단백질 {{ formatNumber(item.protein) }}g</span>
             </div>
             <div>

@@ -55,6 +55,18 @@ const saveTargetOptions = computed(() => [
 
 const selectedSaveOption = computed(() => saveTargetOptions.value.find((option) => option.value === saveTarget.value))
 
+function buildDietRecommendationMessage() {
+  const mealDescription = mealCount.value === 4 ? '아침, 점심, 저녁, 간식 4끼' : '아침, 점심, 저녁 3끼'
+  const condition = preference.value.trim() || '균형 잡힌 건강 식단'
+
+  return [
+    'HealthFit 식단 추천 요청입니다.',
+    `${targetDate.value} 기준으로 ${mealDescription} 하루 식단을 추천해주세요.`,
+    `목표는 건강한 영양 구성, 적절한 칼로리, 충분한 단백질 섭취입니다.`,
+    `사용자 선호 조건: ${condition}`,
+  ].join(' ')
+}
+
 function resetSaveFields() {
   saveTarget.value = 'meal_plan'
   saveTitle.value = recommendation.value?.title || ''
@@ -79,7 +91,7 @@ async function requestRecommendation() {
       target_date: targetDate.value,
       meal_count: mealCount.value,
       food_source: 'all',
-      message: preference.value,
+      message: buildDietRecommendationMessage(),
       preference: preference.value,
     })
     resetSaveFields()
@@ -206,7 +218,7 @@ watch(recommendation, (nextRecommendation) => {
     />
 
     <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4" @submit.prevent="requestRecommendation">
+      <form class="form-card" style="grid-column: span 4; align-self: start" @submit.prevent="requestRecommendation">
         <div class="field-group">
           <label for="target-date">추천 기준 날짜</label>
           <input id="target-date" v-model="targetDate" type="date" />
@@ -241,17 +253,23 @@ watch(recommendation, (nextRecommendation) => {
           추천 상세 열기
         </RouterLink>
 
-        <StateBlock
-          v-if="requestMessage"
-          type="error"
-          title="추천을 불러오지 못했습니다"
-          :message="requestMessage"
-        />
       </form>
 
       <section class="surface-card recommendation-panel" style="grid-column: span 8">
         <StateBlock
-          v-if="isLoading && !recommendation"
+          v-if="requestMessage"
+          type="error"
+          title="추천을 불러오지 못했습니다"
+          message="조건을 조금 바꾸거나 잠시 후 다시 검색해보세요."
+        >
+          <p class="meta-text">{{ requestMessage }}</p>
+          <button class="btn btn-secondary" type="button" :disabled="isLoading" @click="requestRecommendation">
+            다시 추천 받기
+          </button>
+        </StateBlock>
+
+        <StateBlock
+          v-else-if="isLoading && !recommendation"
           type="loading"
           title="추천 식단 생성 중"
           message="AI가 조건에 맞는 식단을 구성하고 있습니다."

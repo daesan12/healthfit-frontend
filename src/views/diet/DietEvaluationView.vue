@@ -1,13 +1,15 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
-import { evaluateDiet } from '@/api/diet'
+import { evaluateDiet, getDietFeedbacks } from '@/api/diet'
 
 const targetDate = ref(new Date().toISOString().slice(0, 10))
 const feedback = ref(null)
+const feedbackHistory = ref([])
 const isLoading = ref(false)
+const isHistoryLoading = ref(false)
 const requestMessage = ref('')
 
 const calorieRate = computed(() => {
@@ -17,18 +19,46 @@ const calorieRate = computed(() => {
   return Math.min(Math.round((total / recommended) * 100), 100)
 })
 
+const scoreDetails = computed(() => [
+  { label: '칼로리', value: feedback.value?.calorieScore },
+  { label: '탄단지', value: feedback.value?.macroScore },
+  { label: '기록 충실도', value: feedback.value?.mealRecordScore },
+].filter((item) => item.value !== null && item.value !== undefined))
+
+function formatNumber(value, digits = 1) {
+  if (value === null || value === undefined || value === '') return '-'
+  return Number(value || 0).toFixed(digits)
+}
+
+async function loadFeedbackHistory() {
+  requestMessage.value = ''
+  isHistoryLoading.value = true
+
+  try {
+    feedbackHistory.value = await getDietFeedbacks({ date: targetDate.value })
+    feedback.value = feedbackHistory.value[0] || null
+  } catch (error) {
+    requestMessage.value = normalizeCaughtError(error).message
+  } finally {
+    isHistoryLoading.value = false
+  }
+}
+
 async function requestEvaluation() {
   requestMessage.value = ''
   isLoading.value = true
 
   try {
     feedback.value = await evaluateDiet({ target_date: targetDate.value })
+    await loadFeedbackHistory()
   } catch (error) {
     requestMessage.value = normalizeCaughtError(error).message
   } finally {
     isLoading.value = false
   }
 }
+
+onMounted(loadFeedbackHistory)
 </script>
 
 <template>
@@ -36,14 +66,14 @@ async function requestEvaluation() {
     <PageHeader
       eyebrow="Diet AI"
       title="오늘의 식단 평가"
-      description="기록한 식단을 권장 칼로리와 영양 기준으로 분석합니다."
+      description="선택한 날짜의 식단 기록을 기준으로 점수, 근거, 권장 섭취량 대비 현재 섭취량을 확인합니다."
     />
 
     <section class="content-grid">
       <form class="form-card" style="grid-column: span 4" @submit.prevent="requestEvaluation">
         <div class="field-group">
           <label for="evaluation-date">평가 날짜</label>
-          <input id="evaluation-date" v-model="targetDate" type="date" />
+          <input id="evaluation-date" v-model="targetDate" type="date" @change="loadFeedbackHistory" />
         </div>
 
         <button class="btn btn-primary" type="submit" :disabled="isLoading">
@@ -57,14 +87,21 @@ async function requestEvaluation() {
           title="평가를 불러오지 못했습니다"
           :message="requestMessage"
         />
+
+        <section class="preview-panel">
+          <p class="section-label">평가 기록</p>
+          <strong>{{ feedbackHistory.length }}개</strong>
+          <span v-if="feedbackHistory[0]">최근 평가 {{ feedbackHistory[0].score }}점 · {{ feedbackHistory[0].createdAt?.slice(0, 10) }}</span>
+          <span v-else>{{ isHistoryLoading ? '조회 중...' : '선택 날짜에 저장된 평가가 없습니다.' }}</span>
+        </section>
       </form>
 
       <section class="surface-card evaluation-panel" style="grid-column: span 8">
         <StateBlock
-          v-if="isLoading && !feedback"
+          v-if="(isLoading || isHistoryLoading) && !feedback"
           type="loading"
-          title="식단 평가 중"
-          message="AI가 해당 날짜의 식단 기록을 분석하고 있습니다."
+          title="식단 평가 조회 중"
+          message="선택한 날짜의 식단 평가와 기존 기록을 불러오고 있습니다."
         />
 
         <template v-else-if="feedback">
@@ -81,7 +118,7 @@ async function requestEvaluation() {
             <div class="section-heading-row">
               <div>
                 <p class="section-label">Calories</p>
-                <h2>{{ feedback.totalCalories }} / {{ feedback.recommendedCalories }} kcal</h2>
+                <h2>{{ formatNumber(feedback.totalCalories, 0) }} / {{ formatNumber(feedback.recommendedCalories, 0) }} kcal</h2>
               </div>
               <span class="chip">{{ calorieRate }}%</span>
             </div>
@@ -92,20 +129,59 @@ async function requestEvaluation() {
 
           <div class="totals-panel recommendation-totals">
             <article>
-              <span>탄수화물</span>
-              <strong>{{ feedback.carbohydrate }}g</strong>
+              <span>섭취 탄수화물</span>
+              <strong>{{ formatNumber(feedback.carbohydrate) }}g</strong>
             </article>
             <article>
-              <span>단백질</span>
-              <strong>{{ feedback.protein }}g</strong>
+              <span>섭취 단백질</span>
+              <strong>{{ formatNumber(feedback.protein) }}g</strong>
             </article>
             <article>
-              <span>지방</span>
-              <strong>{{ feedback.fat }}g</strong>
+              <span>섭취 지방</span>
+              <strong>{{ formatNumber(feedback.fat) }}g</strong>
             </article>
             <article>
               <span>평가 날짜</span>
-              <strong>{{ targetDate }}</strong>
+              <strong>{{ feedback.date || targetDate }}</strong>
+            </article>
+          </div>
+
+          <div class="totals-panel recommendation-totals">
+            <article>
+              <span>권장 탄수화물</span>
+              <strong>{{ formatNumber(feedback.recommendedCarbohydrate) }}g</strong>
+            </article>
+            <article>
+              <span>권장 단백질</span>
+              <strong>{{ formatNumber(feedback.recommendedProtein) }}g</strong>
+            </article>
+            <article>
+              <span>권장 지방</span>
+              <strong>{{ formatNumber(feedback.recommendedFat) }}g</strong>
+            </article>
+            <article>
+              <span>권장 칼로리</span>
+              <strong>{{ formatNumber(feedback.recommendedCalories, 0) }} kcal</strong>
+            </article>
+          </div>
+
+          <div v-if="scoreDetails.length" class="feedback-list">
+            <article v-for="detail in scoreDetails" :key="detail.label">
+              <span class="chip">{{ detail.value }}점</span>
+              <div>
+                <strong>{{ detail.label }} 점수</strong>
+                <p>백엔드가 계산한 세부 점수입니다.</p>
+              </div>
+            </article>
+          </div>
+
+          <div v-if="feedback.reasons.length" class="feedback-list">
+            <article v-for="reason in feedback.reasons" :key="reason">
+              <span class="chip">근거</span>
+              <div>
+                <strong>점수 산정 근거</strong>
+                <p>{{ reason }}</p>
+              </div>
             </article>
           </div>
 

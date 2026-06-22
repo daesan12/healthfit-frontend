@@ -13,6 +13,7 @@ const navItems = [
   { label: '식단', to: '/diet' },
   { label: '운동', to: '/workouts' },
   { label: '기록', to: '/records' },
+  { label: '진행현황보기', to: '/progress' },
   { label: '커뮤니티', to: '/community' },
   { label: '마이', to: '/profile' },
 ]

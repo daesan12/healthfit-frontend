@@ -165,7 +165,7 @@ router.beforeEach((to) => {
   }
 
   if (guestOnly && hasAccessToken) {
-    return { name: 'profile' }
+    return { name: 'home' }
   }
 
   return true

@@ -24,14 +24,14 @@ const recordCards = [
   {
     title: '운동 루틴',
     eyebrow: 'Routine',
-    description: '내 루틴을 만들고 운동 항목을 추가하거나 삭제합니다.',
+    description: '나만의 루틴을 만들고 운동 항목을 추가하거나 삭제합니다.',
     to: '/workout/routines',
     action: '루틴 관리',
   },
   {
     title: '신체 기록',
     eyebrow: 'Body',
-    description: '체중, 체지방률, 골격근량을 날짜별로 관리합니다.',
+    description: '날짜별 체중, 체지방률, 골격근량을 날짜별로 관리합니다.',
     to: '/body-records',
     action: '신체 기록하기',
   },
@@ -62,7 +62,7 @@ const quickLinks = [
         <p class="section-label">Records</p>
         <h1>HealthFit 기록과 관리 화면</h1>
         <p>
-          API 명세서의 식단, 운동, 신체, 저장 식단, 루틴, 사용자 데이터 화면으로 이동합니다.
+          사용자의 식단, 운동, 신체, 저장 식단, 루틴, 사용자 데이터 화면으로 이동합니다.
         </p>
       </div>
       <RouterLink class="btn btn-primary" to="/progress">진행 현황 보기</RouterLink>
@@ -86,7 +86,7 @@ const quickLinks = [
         <div class="section-heading-row">
           <div>
             <p class="section-label">Quick Links</p>
-            <h2>명세서 기반 주요 화면</h2>
+            <h2>빠른 이동</h2>
           </div>
         </div>
         <div class="button-row">

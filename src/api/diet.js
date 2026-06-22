@@ -61,6 +61,8 @@ export async function getMealsPage(params) {
 export async function createMeal(payload) {
   const response = await apiClient.post('/meals/', {
     meal_type: payload.mealType,
+    meal_order: payload.mealOrder,
+    meal_label: payload.mealLabel,
     intake_date: payload.intakeDate,
     items: payload.items.map((item) => ({
       food_id: item.foodId,
@@ -70,8 +72,51 @@ export async function createMeal(payload) {
   return mapMeal(unwrapResponse(response))
 }
 
+export async function getMeal(mealId) {
+  const response = await apiClient.get(`/meals/${mealId}/`)
+  return mapMeal(unwrapResponse(response))
+}
+
+export async function updateMeal(mealId, payload) {
+  const requestBody = {}
+
+  if ('mealType' in payload) requestBody.meal_type = payload.mealType
+  if ('mealOrder' in payload) requestBody.meal_order = payload.mealOrder
+  if ('mealLabel' in payload) requestBody.meal_label = payload.mealLabel
+  if ('intakeDate' in payload) requestBody.intake_date = payload.intakeDate
+  if ('items' in payload) {
+    requestBody.items = payload.items.map((item) => ({
+      food_id: item.foodId,
+      amount: item.amount,
+    }))
+  }
+
+  const response = await apiClient.patch(`/meals/${mealId}/`, requestBody)
+  return mapMeal(unwrapResponse(response))
+}
+
 export async function deleteMeal(mealId) {
   const response = await apiClient.delete(`/meals/${mealId}/`)
+  return unwrapResponse(response)
+}
+
+export async function addMealItem(mealId, payload) {
+  const response = await apiClient.post(`/meals/${mealId}/items/`, {
+    food_id: payload.foodId,
+    amount: payload.amount,
+  })
+  return unwrapResponse(response)
+}
+
+export async function updateMealItem(mealItemId, payload) {
+  const response = await apiClient.patch(`/meal-items/${mealItemId}/`, {
+    amount: payload.amount,
+  })
+  return unwrapResponse(response)
+}
+
+export async function deleteMealItem(mealItemId) {
+  const response = await apiClient.delete(`/meal-items/${mealItemId}/`)
   return unwrapResponse(response)
 }
 
@@ -139,6 +184,13 @@ export async function getDietRecommendation(recommendationId) {
 export async function evaluateDiet(payload) {
   const response = await apiClient.post('/ai/diet/evaluations/', payload)
   return mapDietFeedback(unwrapResponse(response))
+}
+
+export async function getDietFeedbacks(params) {
+  const response = await apiClient.get('/diet-feedbacks/', { params })
+  const data = unwrapResponse(response)
+  const results = Array.isArray(data) ? data : data.results || data || []
+  return results.map(mapDietFeedback)
 }
 
 export async function saveDietRecommendation(recommendationId, payload) {

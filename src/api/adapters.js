@@ -14,6 +14,8 @@ export function mapMeal(apiMeal) {
   return {
     id: apiMeal.id,
     mealType: apiMeal.meal_type,
+    mealOrder: apiMeal.meal_order,
+    mealLabel: apiMeal.meal_label || '',
     intakeDate: apiMeal.intake_date,
     totalCalories: Number(apiMeal.total_calories || 0),
     totalCarbohydrate: Number(apiMeal.total_carbohydrate || 0),
@@ -87,6 +89,7 @@ export function mapProgress(apiProgress) {
     bodySummary: {
       startingWeight: bodySummary.starting_weight,
       latestWeight: bodySummary.latest_weight,
+      averageWeight: bodySummary.average_weight,
       weightChange: bodySummary.weight_change,
       recentRecords: bodySummary.recent_records || [],
     },
@@ -97,6 +100,8 @@ export function mapProgress(apiProgress) {
       totalProtein: Number(mealSummary.total_protein || 0),
       totalFat: Number(mealSummary.total_fat || 0),
       mealScore: mealSummary.meal_score,
+      averageMealScore: mealSummary.average_meal_score,
+      averageIntakeCalories: mealSummary.average_intake_calories,
       daily: mealSummary.daily || [],
     },
     workoutSummary: {
@@ -104,6 +109,7 @@ export function mapProgress(apiProgress) {
       totalWorkoutTime: workoutSummary.total_workout_time || 0,
       daily: workoutSummary.daily || [],
     },
+    chartData: apiProgress.chart_data || [],
   }
 }
 
@@ -294,15 +300,29 @@ export function mapDietRecommendation(apiRecommendation) {
   }
 
 export function mapDietFeedback(apiFeedback) {
+  const target = apiFeedback.target || {}
+  const scoreDetail = apiFeedback.score_detail || {}
+
   return {
     id: apiFeedback.feedback_id || apiFeedback.id,
     date: apiFeedback.date || apiFeedback.created_at,
     score: apiFeedback.score,
     totalCalories: apiFeedback.total_calories,
-    recommendedCalories: apiFeedback.recommended_calories || apiFeedback.target_calories || apiFeedback.total_calories,
+    recommendedCalories:
+      target.recommended_calories ||
+      apiFeedback.recommended_calories ||
+      apiFeedback.target_calories ||
+      apiFeedback.total_calories,
     carbohydrate: apiFeedback.total_carbohydrate,
     protein: apiFeedback.total_protein,
     fat: apiFeedback.total_fat,
+    recommendedCarbohydrate: target.recommended_carbohydrate,
+    recommendedProtein: target.recommended_protein,
+    recommendedFat: target.recommended_fat,
+    calorieScore: scoreDetail.calorie_score,
+    macroScore: scoreDetail.macro_score,
+    mealRecordScore: scoreDetail.meal_record_score,
+    reasons: scoreDetail.reasons || [],
     feedback: apiFeedback.feedback,
     checks: [
       ...(apiFeedback.strengths || []).map((detail) => ({ label: '강점', status: '좋음', detail })),

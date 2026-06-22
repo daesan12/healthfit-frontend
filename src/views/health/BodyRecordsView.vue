@@ -137,7 +137,7 @@ onMounted(() => fetchRecords(1))
     />
 
     <section class="content-grid">
-      <form class="form-card" style="grid-column: span 5" @submit.prevent="saveRecord">
+      <form class="form-card" style="grid-column: span 5; align-self: start" @submit.prevent="saveRecord">
         <div class="field-group">
           <label for="record-date">기록 날짜</label>
           <input id="record-date" v-model="form.recordDate" type="date" />

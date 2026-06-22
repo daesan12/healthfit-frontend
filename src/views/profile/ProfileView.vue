@@ -210,7 +210,7 @@ onMounted(async () => {
           <button class="btn btn-primary" type="submit" :disabled="profileStore.isLoading">
             {{ profileStore.isLoading ? '저장 중...' : '프로필 저장' }}
           </button>
-          <RouterLink class="btn btn-secondary" to="/diet">식단 대시보드 보기</RouterLink>
+          <!-- <RouterLink class="btn btn-secondary" to="/diet">식단 대시보드 보기</RouterLink> -->
         </div>
       </form>
 

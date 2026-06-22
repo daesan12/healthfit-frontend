@@ -46,7 +46,7 @@ async function handleLogin() {
       password: form.password,
     })
 
-    router.push(route.query.redirect?.toString() || '/profile')
+    router.push(route.query.redirect?.toString() || '/')
   } catch (error) {
     const apiError = normalizeCaughtError(error)
     applyServerErrors(apiError.errors)

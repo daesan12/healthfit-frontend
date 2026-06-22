@@ -14,12 +14,14 @@ const form = reactive({
   username: '',
   email: '',
   password: '',
+  passwordConfirm: '',
 })
 
 const errors = reactive({
   username: '',
   email: '',
   password: '',
+  passwordConfirm: '',
 })
 
 const formMessage = ref('')
@@ -30,8 +32,9 @@ function validateSignup() {
   errors.username = form.username.trim().length >= 3 ? '' : '아이디는 3자 이상 입력해주세요.'
   errors.email = emailPattern.test(form.email.trim()) ? '' : '올바른 이메일 형식으로 입력해주세요.'
   errors.password = form.password.length >= 8 ? '' : '비밀번호는 8자 이상 입력해주세요.'
+  errors.passwordConfirm = form.password === form.passwordConfirm ? '' : '비밀번호가 일치하지 않습니다.'
 
-  return !errors.username && !errors.email && !errors.password
+  return !errors.username && !errors.email && !errors.password && !errors.passwordConfirm
 }
 
 function applyServerErrors(serverErrors) {
@@ -39,6 +42,7 @@ function applyServerErrors(serverErrors) {
   errors.username = fieldErrors.username || ''
   errors.email = fieldErrors.email || ''
   errors.password = fieldErrors.password || fieldErrors.non_field_errors || ''
+  errors.passwordConfirm = ''
 }
 
 async function handleSignup() {
@@ -91,6 +95,12 @@ async function handleSignup() {
         <label for="password">비밀번호</label>
         <input id="password" v-model="form.password" type="password" placeholder="8자 이상" />
         <p v-if="errors.password" class="error-text">{{ errors.password }}</p>
+      </div>
+
+      <div class="field-group" :class="{ 'has-error': errors.passwordConfirm }">
+        <label for="password-confirm">비밀번호 확인</label>
+        <input id="password-confirm" v-model="form.passwordConfirm" type="password" placeholder="비밀번호 재입력" />
+        <p v-if="errors.passwordConfirm" class="error-text">{{ errors.passwordConfirm }}</p>
       </div>
 
       <p v-if="formMessage" class="form-message">{{ formMessage }}</p>

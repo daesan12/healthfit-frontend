@@ -3,7 +3,17 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
-import { createMeal, deleteMeal, getFoods, getMealsPage } from '@/api/diet'
+import {
+  addMealItem,
+  createMeal,
+  deleteMeal,
+  deleteMealItem,
+  getFoods,
+  getMeal,
+  getMealsPage,
+  updateMeal,
+  updateMealItem,
+} from '@/api/diet'
 import { useToastStore } from '@/stores/toast'
 
 const mealTypes = [
@@ -13,9 +23,24 @@ const mealTypes = [
   { label: '간식', value: 'snack' },
 ]
 
+const today = new Date().toISOString().slice(0, 10)
 const form = reactive({
-  intakeDate: new Date().toISOString().slice(0, 10),
+  intakeDate: today,
   mealType: 'breakfast',
+  mealOrder: 1,
+  mealLabel: '아침',
+})
+
+const detailForm = reactive({
+  mealType: 'breakfast',
+  mealOrder: 1,
+  mealLabel: '',
+  intakeDate: today,
+})
+
+const detailNewItem = reactive({
+  foodId: '',
+  amount: 100,
 })
 
 const pagination = reactive({
@@ -33,15 +58,21 @@ const selectedFoodId = ref('')
 const amount = ref(100)
 const mealItems = ref([])
 const meals = ref([])
+const selectedMeal = ref(null)
+const editingAmounts = reactive({})
 const isLoading = ref(false)
 const isSaving = ref(false)
+const isDetailLoading = ref(false)
+const isDetailSaving = ref(false)
 const deletingMealId = ref(null)
 const pendingDeleteMealId = ref(null)
 const formMessage = ref('')
+const detailMessage = ref('')
 const errorMessage = ref('')
 const toastStore = useToastStore()
 
 const selectedFood = computed(() => foods.value.find((food) => food.id === Number(selectedFoodId.value)))
+const detailSelectedFood = computed(() => foods.value.find((food) => food.id === Number(detailNewItem.foodId)))
 const calculatedPreview = computed(() => calculateNutrition(selectedFood.value, amount.value))
 
 const totals = computed(() =>
@@ -94,6 +125,26 @@ function mealTypeLabel(value) {
   return mealTypes.find((type) => type.value === value)?.label || value
 }
 
+function defaultMealLabel(mealType, mealOrder) {
+  const base = mealTypeLabel(mealType)
+  return Number(mealOrder || 1) <= 4 ? base : `${mealOrder}번째 식사`
+}
+
+function syncLabelFromType() {
+  form.mealLabel = defaultMealLabel(form.mealType, form.mealOrder)
+}
+
+function hydrateDetailForm(meal) {
+  detailForm.mealType = meal.mealType || 'breakfast'
+  detailForm.mealOrder = meal.mealOrder || 1
+  detailForm.mealLabel = meal.mealLabel || defaultMealLabel(detailForm.mealType, detailForm.mealOrder)
+  detailForm.intakeDate = meal.intakeDate || form.intakeDate
+  Object.keys(editingAmounts).forEach((key) => delete editingAmounts[key])
+  meal.mealItems.forEach((item) => {
+    editingAmounts[item.id] = item.amount
+  })
+}
+
 async function fetchFoods() {
   isLoading.value = true
   errorMessage.value = ''
@@ -101,6 +152,7 @@ async function fetchFoods() {
   try {
     foods.value = await getFoods(foodSearch.value.trim() ? { search: foodSearch.value.trim(), page_size: 50 } : { page_size: 50 })
     if (!selectedFoodId.value && foods.value[0]) selectedFoodId.value = foods.value[0].id
+    if (!detailNewItem.foodId && foods.value[0]) detailNewItem.foodId = foods.value[0].id
   } catch (error) {
     errorMessage.value = normalizeCaughtError(error).message
   } finally {
@@ -119,12 +171,15 @@ async function fetchMeals(page = pagination.page) {
     })
     meals.value = data.results
     syncPagination(data)
+    if (selectedMeal.value && !meals.value.some((meal) => meal.id === selectedMeal.value.id)) {
+      selectedMeal.value = null
+    }
   } catch (error) {
     errorMessage.value = normalizeCaughtError(error).message
   }
 }
 
-function addMealItem() {
+function addMealItemToDraft() {
   formMessage.value = ''
 
   if (!selectedFood.value || Number(amount.value) <= 0) {
@@ -133,13 +188,13 @@ function addMealItem() {
   }
 
   mealItems.value.push({
-    id: Date.now(),
+    id: `${selectedFood.value.id}-${Date.now()}`,
     food: selectedFood.value,
     amount: Number(amount.value),
   })
 }
 
-function removeMealItem(itemId) {
+function removeMealItemFromDraft(itemId) {
   mealItems.value = mealItems.value.filter((item) => item.id !== itemId)
 }
 
@@ -157,6 +212,8 @@ async function saveMeal() {
   try {
     await createMeal({
       mealType: form.mealType,
+      mealOrder: Number(form.mealOrder || 1),
+      mealLabel: form.mealLabel.trim() || defaultMealLabel(form.mealType, form.mealOrder),
       intakeDate: form.intakeDate,
       items: mealItems.value.map((item) => ({
         foodId: item.food.id,
@@ -165,12 +222,119 @@ async function saveMeal() {
     })
     mealItems.value = []
     formMessage.value = '식단 기록이 저장되었습니다.'
-    toastStore.success('식단 저장 완료', '오늘 식단 기록에 반영했습니다.')
+    toastStore.success('식단 저장 완료', '선택한 날짜의 식단 기록에 반영했습니다.')
     await fetchMeals(1)
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   } finally {
     isSaving.value = false
+  }
+}
+
+async function loadMealDetail(mealId) {
+  detailMessage.value = ''
+  isDetailLoading.value = true
+
+  try {
+    selectedMeal.value = await getMeal(mealId)
+    hydrateDetailForm(selectedMeal.value)
+  } catch (error) {
+    detailMessage.value = normalizeCaughtError(error).message
+  } finally {
+    isDetailLoading.value = false
+  }
+}
+
+async function saveMealMeta() {
+  if (!selectedMeal.value) return
+  detailMessage.value = ''
+  isDetailSaving.value = true
+
+  try {
+    selectedMeal.value = await updateMeal(selectedMeal.value.id, {
+      mealType: detailForm.mealType,
+      mealOrder: Number(detailForm.mealOrder || 1),
+      mealLabel: detailForm.mealLabel.trim() || defaultMealLabel(detailForm.mealType, detailForm.mealOrder),
+      intakeDate: detailForm.intakeDate,
+    })
+    hydrateDetailForm(selectedMeal.value)
+    detailMessage.value = '식단 정보가 수정되었습니다.'
+    await fetchMeals(pagination.page)
+  } catch (error) {
+    detailMessage.value = normalizeCaughtError(error).message
+  } finally {
+    isDetailSaving.value = false
+  }
+}
+
+async function addItemToSelectedMeal() {
+  if (!selectedMeal.value) return
+  detailMessage.value = ''
+
+  if (!detailSelectedFood.value || Number(detailNewItem.amount) <= 0) {
+    detailMessage.value = '추가할 음식과 섭취량을 확인해주세요.'
+    return
+  }
+
+  isDetailSaving.value = true
+
+  try {
+    await addMealItem(selectedMeal.value.id, {
+      foodId: Number(detailNewItem.foodId),
+      amount: Number(detailNewItem.amount),
+    })
+    selectedMeal.value = await getMeal(selectedMeal.value.id)
+    hydrateDetailForm(selectedMeal.value)
+    detailNewItem.amount = 100
+    detailMessage.value = '음식이 추가되었습니다.'
+    await fetchMeals(pagination.page)
+  } catch (error) {
+    detailMessage.value = normalizeCaughtError(error).message
+  } finally {
+    isDetailSaving.value = false
+  }
+}
+
+async function saveItemAmount(itemId) {
+  if (!selectedMeal.value) return
+  detailMessage.value = ''
+
+  const nextAmount = Number(editingAmounts[itemId])
+  if (nextAmount <= 0) {
+    detailMessage.value = '섭취량은 0보다 커야 합니다.'
+    return
+  }
+
+  isDetailSaving.value = true
+
+  try {
+    await updateMealItem(itemId, { amount: nextAmount })
+    selectedMeal.value = await getMeal(selectedMeal.value.id)
+    hydrateDetailForm(selectedMeal.value)
+    detailMessage.value = '섭취량이 수정되었습니다.'
+    await fetchMeals(pagination.page)
+  } catch (error) {
+    detailMessage.value = normalizeCaughtError(error).message
+  } finally {
+    isDetailSaving.value = false
+  }
+}
+
+async function removeItemFromSelectedMeal(itemId) {
+  if (!selectedMeal.value) return
+  detailMessage.value = ''
+  isDetailSaving.value = true
+
+  try {
+    await deleteMealItem(itemId)
+    selectedMeal.value = await getMeal(selectedMeal.value.id)
+    hydrateDetailForm(selectedMeal.value)
+    detailMessage.value = '음식이 삭제되었습니다.'
+    await fetchMeals(pagination.page)
+  } catch (error) {
+    detailMessage.value = normalizeCaughtError(error).message
+  } finally {
+    isDetailSaving.value = false
   }
 }
 
@@ -187,7 +351,8 @@ async function removeSavedMeal(mealId) {
 
   try {
     await deleteMeal(mealId)
-    formMessage.value = '식단 기록을 삭제했습니다.'
+    if (selectedMeal.value?.id === mealId) selectedMeal.value = null
+    formMessage.value = '식단 기록이 삭제되었습니다.'
     pendingDeleteMealId.value = null
     await fetchMeals(meals.value.length === 1 && pagination.page > 1 ? pagination.page - 1 : pagination.page)
   } catch (error) {
@@ -204,6 +369,7 @@ function cancelDelete() {
 
 async function handleDateChange() {
   pendingDeleteMealId.value = null
+  selectedMeal.value = null
   await fetchMeals(1)
 }
 
@@ -218,23 +384,35 @@ onMounted(async () => {
     <PageHeader
       eyebrow="Diet"
       title="식단 기록"
-      description="섭취한 음식을 추가하고 날짜별 식단 기록을 저장합니다."
+      description="날짜와 식사 순서를 기준으로 실제 섭취 음식을 기록하고 상세 항목을 관리합니다."
     />
 
     <section class="content-grid">
-      <form class="form-card" style="grid-column: span 5" @submit.prevent="saveMeal">
+      <form class="form-card" style="grid-column: span 5; align-self: start" @submit.prevent="saveMeal">
         <div class="field-group">
           <label for="intake-date">섭취 날짜</label>
           <input id="intake-date" v-model="form.intakeDate" type="date" @change="handleDateChange" />
         </div>
 
+        <div class="content-grid compact-form-grid">
+          <div class="field-group" style="grid-column: span 6">
+            <label for="meal-type">식사 유형</label>
+            <select id="meal-type" v-model="form.mealType" @change="syncLabelFromType">
+              <option v-for="type in mealTypes" :key="type.value" :value="type.value">
+                {{ type.label }}
+              </option>
+            </select>
+          </div>
+
+          <div class="field-group" style="grid-column: span 6">
+            <label for="meal-order">식사 순서</label>
+            <input id="meal-order" v-model.number="form.mealOrder" type="number" min="1" max="6" @change="syncLabelFromType" />
+          </div>
+        </div>
+
         <div class="field-group">
-          <label for="meal-type">식사 구분</label>
-          <select id="meal-type" v-model="form.mealType">
-            <option v-for="type in mealTypes" :key="type.value" :value="type.value">
-              {{ type.label }}
-            </option>
-          </select>
+          <label for="meal-label">식사 이름</label>
+          <input id="meal-label" v-model="form.mealLabel" type="text" placeholder="예: 운동 후 식사" />
         </div>
 
         <div class="field-group">
@@ -268,7 +446,7 @@ onMounted(async () => {
           </span>
         </div>
 
-        <button class="btn btn-secondary" type="button" @click="addMealItem">음식 추가</button>
+        <button class="btn btn-secondary" type="button" @click="addMealItemToDraft">음식 추가</button>
 
         <div class="meal-list">
           <article v-for="item in mealItems" :key="item.id" class="meal-item">
@@ -276,7 +454,7 @@ onMounted(async () => {
               <strong>{{ item.food.name }}</strong>
               <span>{{ item.amount }}g · {{ formatNumber(calculateNutrition(item.food, item.amount).calories) }}kcal</span>
             </div>
-            <button type="button" @click="removeMealItem(item.id)">제외</button>
+            <button type="button" @click="removeMealItemFromDraft(item.id)">제외</button>
           </article>
         </div>
 
@@ -329,14 +507,15 @@ onMounted(async () => {
         <div v-else class="meal-list">
           <article v-for="meal in meals" :key="meal.id" class="meal-item">
             <div>
-              <strong>{{ mealTypeLabel(meal.mealType) }}</strong>
-              <span>{{ formatNumber(meal.totalCalories) }}kcal</span>
+              <strong>{{ meal.mealLabel || mealTypeLabel(meal.mealType) }}</strong>
+              <span>{{ meal.mealOrder || 1 }}번째 · {{ mealTypeLabel(meal.mealType) }} · {{ formatNumber(meal.totalCalories) }}kcal</span>
               <span v-for="item in meal.mealItems" :key="item.id">
                 {{ item.foodName }} {{ item.amount }}g
               </span>
             </div>
             <div class="delete-actions">
               <span>{{ meal.intakeDate }}</span>
+              <button type="button" @click="loadMealDetail(meal.id)">상세</button>
               <button
                 type="button"
                 :class="{ 'is-danger': pendingDeleteMealId === meal.id }"
@@ -371,10 +550,113 @@ onMounted(async () => {
             title="저장된 식단이 없습니다"
             message="왼쪽에서 음식을 추가하고 식단을 저장해보세요."
           >
-            <a class="btn btn-primary" href="#food-search">음식 추가하기</a>
-            <RouterLink class="btn btn-secondary" to="/foods">음식 데이터 보기</RouterLink>
+            <!-- <a class="btn btn-primary" href="#food-search">음식 추가하기</a>
+            <RouterLink class="btn btn-secondary" to="/foods">음식 데이터 보기</RouterLink> -->
           </StateBlock>
         </div>
+      </section>
+
+      <section class="surface-card" style="grid-column: span 12">
+        <div class="section-heading-row">
+          <div>
+            <p class="section-label">Meal Detail</p>
+            <h2>{{ selectedMeal ? `${selectedMeal.mealLabel || mealTypeLabel(selectedMeal.mealType)} 상세 관리` : '식단을 선택하세요' }}</h2>
+          </div>
+          <span v-if="selectedMeal" class="chip">{{ formatNumber(selectedMeal.totalCalories) }}kcal</span>
+        </div>
+
+        <StateBlock
+          v-if="isDetailLoading"
+          type="loading"
+          title="식단 상세 조회 중"
+          message="선택한 식단의 음식 항목을 불러오고 있습니다."
+        />
+
+        <StateBlock
+          v-else-if="!selectedMeal"
+          type="empty"
+          title="상세 관리할 식단이 없습니다"
+          message="위 목록에서 상세 버튼을 누르면 음식 추가, 섭취량 수정, 삭제를 할 수 있습니다."
+        />
+
+        <template v-else>
+          <form class="content-grid compact-form-grid" @submit.prevent="saveMealMeta">
+            <div class="field-group" style="grid-column: span 3">
+              <label for="detail-date">날짜</label>
+              <input id="detail-date" v-model="detailForm.intakeDate" type="date" />
+            </div>
+            <div class="field-group" style="grid-column: span 3">
+              <label for="detail-type">식사 유형</label>
+              <select id="detail-type" v-model="detailForm.mealType">
+                <option v-for="type in mealTypes" :key="type.value" :value="type.value">
+                  {{ type.label }}
+                </option>
+              </select>
+            </div>
+            <div class="field-group" style="grid-column: span 2">
+              <label for="detail-order">순서</label>
+              <input id="detail-order" v-model.number="detailForm.mealOrder" type="number" min="1" max="6" />
+            </div>
+            <div class="field-group" style="grid-column: span 3">
+              <label for="detail-label">이름</label>
+              <input id="detail-label" v-model="detailForm.mealLabel" type="text" />
+            </div>
+            <button class="btn btn-primary" style="grid-column: span 1" type="submit" :disabled="isDetailSaving">
+              저장
+            </button>
+          </form>
+
+          <div class="totals-panel">
+            <article>
+              <span>칼로리</span>
+              <strong>{{ formatNumber(selectedMeal.totalCalories) }}kcal</strong>
+            </article>
+            <article>
+              <span>탄수화물</span>
+              <strong>{{ formatNumber(selectedMeal.totalCarbohydrate) }}g</strong>
+            </article>
+            <article>
+              <span>단백질</span>
+              <strong>{{ formatNumber(selectedMeal.totalProtein) }}g</strong>
+            </article>
+            <article>
+              <span>지방</span>
+              <strong>{{ formatNumber(selectedMeal.totalFat) }}g</strong>
+            </article>
+          </div>
+
+          <div class="content-grid compact-form-grid" style="margin-top: 1rem">
+            <div class="field-group" style="grid-column: span 5">
+              <label for="detail-food">추가 음식</label>
+              <select id="detail-food" v-model="detailNewItem.foodId">
+                <option v-for="food in foods" :key="food.id" :value="food.id">{{ food.name }}</option>
+              </select>
+            </div>
+            <div class="field-group" style="grid-column: span 3">
+              <label for="detail-amount">섭취량(g)</label>
+              <input id="detail-amount" v-model.number="detailNewItem.amount" type="number" min="1" />
+            </div>
+            <button class="btn btn-secondary" style="grid-column: span 4" type="button" :disabled="isDetailSaving" @click="addItemToSelectedMeal">
+              선택 식단에 음식 추가
+            </button>
+          </div>
+
+          <div class="meal-list" style="margin-top: 1rem">
+            <article v-for="item in selectedMeal.mealItems" :key="item.id" class="meal-item">
+              <div>
+                <strong>{{ item.foodName }}</strong>
+                <span>{{ formatNumber(item.calories) }}kcal · 탄수 {{ formatNumber(item.carbohydrate) }}g · 단백질 {{ formatNumber(item.protein) }}g · 지방 {{ formatNumber(item.fat) }}g</span>
+              </div>
+              <div class="delete-actions">
+                <input v-model.number="editingAmounts[item.id]" type="number" min="1" style="width: 110px" />
+                <button type="button" :disabled="isDetailSaving" @click="saveItemAmount(item.id)">수정</button>
+                <button type="button" :disabled="isDetailSaving" @click="removeItemFromSelectedMeal(item.id)">삭제</button>
+              </div>
+            </article>
+          </div>
+
+          <p v-if="detailMessage" class="form-message" style="margin-top: 1rem">{{ detailMessage }}</p>
+        </template>
       </section>
     </section>
   </main>

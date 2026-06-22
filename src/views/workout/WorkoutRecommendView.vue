@@ -86,7 +86,7 @@ async function saveRoutine() {
     />
 
     <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4" @submit.prevent="requestRecommendation">
+      <form class="form-card" style="grid-column: span 4; align-self: start" @submit.prevent="requestRecommendation">
         <div class="field-group">
           <label for="available-time">운동 가능 시간(분)</label>
           <input id="available-time" v-model.number="availableTime" type="number" min="10" />
@@ -116,17 +116,23 @@ async function saveRoutine() {
           {{ isLoading ? '추천 생성 중...' : 'AI 루틴 받기' }}
         </button>
 
-        <StateBlock
-          v-if="requestMessage"
-          type="error"
-          title="추천을 불러오지 못했습니다"
-          :message="requestMessage"
-        />
       </form>
 
       <section class="surface-card routine-panel" style="grid-column: span 8">
         <StateBlock
-          v-if="isLoading && !recommendation"
+          v-if="requestMessage"
+          type="error"
+          title="추천을 불러오지 못했습니다"
+          message="조건을 조금 바꾸거나 잠시 후 다시 검색해보세요."
+        >
+          <p class="meta-text">{{ requestMessage }}</p>
+          <button class="btn btn-secondary" type="button" :disabled="isLoading" @click="requestRecommendation">
+            다시 추천 받기
+          </button>
+        </StateBlock>
+
+        <StateBlock
+          v-else-if="isLoading && !recommendation"
           type="loading"
           title="운동 루틴 생성 중"
           message="AI가 조건에 맞는 운동 루틴을 구성하고 있습니다."

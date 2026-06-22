@@ -20,6 +20,7 @@ const isLoading = ref(false)
 const message = ref('')
 const errorMessage = ref('')
 const search = ref('')
+const exerciseSearch = ref('')
 const editingRoutineId = ref(null)
 const editingRoutineItemId = ref(null)
 const savingItemId = ref(null)
@@ -110,7 +111,9 @@ async function fetchRoutines(page = 1) {
 }
 
 async function fetchExercises() {
-  exercises.value = await getWorkouts({ page_size: 100 })
+  exercises.value = await getWorkouts(
+    exerciseSearch.value.trim() ? { search: exerciseSearch.value.trim(), page_size: 100 } : { page_size: 100 },
+  )
 }
 
 function startEditRoutine(routine) {
@@ -263,7 +266,7 @@ onMounted(() => {
     />
 
     <section class="content-grid">
-      <div class="form-card" style="grid-column: span 4">
+      <div class="form-card" style="grid-column: span 4; align-self: start">
         <form @submit.prevent="submitRoutine">
           <p class="section-label">{{ editingRoutineId ? 'Edit Routine' : 'New Routine' }}</p>
           <div class="field-group">
@@ -291,6 +294,10 @@ onMounted(() => {
           </div>
           <div class="field-group">
             <label for="exercise-select">운동</label>
+            <div class="inline-controls" style="margin-bottom: 0.5rem">
+              <input id="routine-exercise-search" v-model="exerciseSearch" type="text" placeholder="운동 이름 검색" />
+              <button class="btn btn-secondary" type="button" @click="fetchExercises">검색</button>
+            </div>
             <select id="exercise-select" v-model="itemForm.exerciseId" :disabled="Boolean(editingRoutineItemId)">
               <option value="">선택</option>
               <option v-for="exercise in exercises" :key="exercise.id" :value="exercise.id">{{ exercise.name }}</option>

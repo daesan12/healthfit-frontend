@@ -91,10 +91,9 @@ async function handleLogin() {
 
       <aside class="surface-card" style="grid-column: span 7">
         <p class="section-label">Account</p>
-        <h2>로그인하면 개인 기록이 저장됩니다</h2>
+        <h2>로그인을 진행해 주세요</h2>
         <p>
-          로그인 후 식단, 운동, 신체 기록을 저장하고 진행 현황 페이지에서 기간별 변화를 확인할 수 있습니다.
-          인증이 필요한 화면에 접근하면 로그인 후 원래 보려던 화면으로 돌아갑니다.
+          식단, 운동, 신체 기록을 저장하고 진행 현황 페이지에서 기간별 변화를 확인할 수 있습니다.
         </p>
       </aside>
     </section>

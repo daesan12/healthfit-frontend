@@ -105,6 +105,14 @@ onMounted(loadFeedbackHistory)
         />
 
         <template v-else-if="feedback">
+          <div class="section-heading-row">
+            <div>
+              <p class="section-label">Auto Saved</p>
+              <h2>AI 평가 기록에 저장됨</h2>
+            </div>
+            <RouterLink class="btn btn-secondary" to="/diet/evaluation">평가 기록 보기</RouterLink>
+          </div>
+
           <div class="score-summary">
             <div>
               <p class="section-label">Diet Score</p>

@@ -150,6 +150,11 @@ async function saveRoutine() {
           </div>
 
           <p v-if="saveMessage" class="form-message">{{ saveMessage }}</p>
+          <div v-if="saveMessage" class="button-row">
+            <RouterLink class="btn btn-secondary" to="/workout/routines">저장 루틴 보기</RouterLink>
+            <RouterLink class="btn btn-secondary" to="/workout/logs">운동 기록으로 이동</RouterLink>
+            <RouterLink class="btn btn-secondary" to="/community">커뮤니티에 공유</RouterLink>
+          </div>
           <p class="card-description">{{ recommendation.reason }}</p>
 
           <div class="routine-list">

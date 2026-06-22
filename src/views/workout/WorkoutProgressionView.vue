@@ -3,12 +3,14 @@ import { onMounted, reactive, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
-import { getWorkouts, recommendWorkoutProgression } from '@/api/workout'
+import { createWorkoutLog, getWorkouts, recommendWorkoutProgression } from '@/api/workout'
 
 const exercises = ref([])
 const result = ref(null)
 const isLoading = ref(false)
+const isSaving = ref(false)
 const errorMessage = ref('')
+const saveMessage = ref('')
 
 const form = reactive({
   workoutId: '',
@@ -27,6 +29,7 @@ async function fetchExercises() {
 
 async function requestProgression() {
   errorMessage.value = ''
+  saveMessage.value = ''
   result.value = null
 
   if (!form.workoutId) {
@@ -50,6 +53,47 @@ async function requestProgression() {
   }
 }
 
+async function saveProgressionLog() {
+  saveMessage.value = ''
+
+  if (!result.value?.recommendation || !form.workoutId) {
+    saveMessage.value = '먼저 AI 진행 추천을 받아주세요.'
+    return
+  }
+
+  const recommendation = result.value.recommendation
+  const setCount = Number(recommendation.set_count || 1)
+  const repetition = Number(recommendation.repetition || 1)
+
+  isSaving.value = true
+
+  try {
+    await createWorkoutLog({
+      workoutId: Number(form.workoutId),
+      routineId: null,
+      workoutDate: result.value.target_date || form.targetDate,
+      workoutTime: 30,
+      memo: `AI 진행 추천 저장\n${result.value.reason || ''}\n${result.value.safety_note || ''}`.trim(),
+      sets: Array.from({ length: setCount }, (_, index) => ({
+        set_order: index + 1,
+        weight_kg:
+          recommendation.weight_kg === null || recommendation.weight_kg === undefined
+            ? null
+            : Number(recommendation.weight_kg),
+        repetition,
+        duration_seconds: null,
+        rpe: null,
+        is_warmup: false,
+      })),
+    })
+    saveMessage.value = 'AI 진행 추천을 운동 기록으로 저장했습니다.'
+  } catch (error) {
+    saveMessage.value = normalizeCaughtError(error).message
+  } finally {
+    isSaving.value = false
+  }
+}
+
 onMounted(fetchExercises)
 </script>
 
@@ -62,7 +106,7 @@ onMounted(fetchExercises)
     />
 
     <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4" @submit.prevent="requestProgression">
+      <form class="form-card" style="grid-column: span 4; align-self: start" @submit.prevent="requestProgression">
         <div class="field-group">
           <label for="progression-exercise">운동</label>
           <select id="progression-exercise" v-model="form.workoutId">
@@ -99,8 +143,15 @@ onMounted(fetchExercises)
               <p class="section-label">{{ result.decision }}</p>
               <h2>{{ result.workout_name }}</h2>
             </div>
-            <span class="chip">{{ result.target_date }}</span>
+            <div class="button-row">
+              <span class="chip">{{ result.target_date }}</span>
+              <button class="btn btn-secondary" type="button" :disabled="isSaving" @click="saveProgressionLog">
+                {{ isSaving ? '저장 중...' : '운동 기록으로 저장' }}
+              </button>
+            </div>
           </div>
+
+          <p v-if="saveMessage" class="form-message">{{ saveMessage }}</p>
 
           <div class="totals-panel recommendation-totals">
             <article>

@@ -540,8 +540,8 @@ onMounted(async () => {
             title="저장된 운동 기록이 없습니다"
             message="왼쪽에서 오늘 수행한 운동을 기록해보세요."
           >
-            <a class="btn btn-primary" href="#exercise">운동 기록하기</a>
-            <RouterLink class="btn btn-secondary" to="/workouts">운동 찾기</RouterLink>
+            <!-- <a class="btn btn-primary" href="#exercise">운동 기록하기</a>
+            <RouterLink class="btn btn-secondary" to="/workouts">운동 찾기</RouterLink> -->
           </StateBlock>
         </div>
       </section>

@@ -1339,6 +1339,8 @@ a {
   grid-template-columns: minmax(220px, 1fr) minmax(150px, 180px) minmax(150px, 180px) auto;
   gap: 1rem;
   align-items: end;
+  align-self: start;
+  height: fit-content;
   margin-bottom: 1rem;
 }
 

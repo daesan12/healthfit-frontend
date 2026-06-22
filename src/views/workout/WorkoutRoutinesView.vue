@@ -114,6 +114,9 @@ async function fetchExercises() {
   exercises.value = await getWorkouts(
     exerciseSearch.value.trim() ? { search: exerciseSearch.value.trim(), page_size: 100 } : { page_size: 100 },
   )
+  if (!exercises.value.some((exercise) => exercise.id === Number(itemForm.exerciseId))) {
+    itemForm.exerciseId = ''
+  }
 }
 
 function startEditRoutine(routine) {

@@ -97,6 +97,9 @@ async function fetchSavedMeals(page = 1) {
 
 async function fetchFoods() {
   foods.value = await getFoods(foodSearch.value.trim() ? { search: foodSearch.value.trim(), page_size: 100 } : { page_size: 100 })
+  if (!foods.value.some((food) => food.id === Number(form.foodId))) {
+    form.foodId = ''
+  }
 }
 
 function addItemToForm() {

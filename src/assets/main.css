@@ -1253,15 +1253,28 @@ a {
 }
 
 .meal-plan-card li {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content 4rem;
   gap: 0.75rem;
   align-items: center;
-  justify-content: space-between;
   color: var(--color-muted);
+}
+
+.meal-plan-card li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .meal-plan-card li strong {
   color: var(--color-text);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.meal-plan-card li .btn {
+  width: 4rem;
+  min-height: 2.75rem;
+  padding-inline: 0;
   white-space: nowrap;
 }
 
@@ -1744,6 +1757,15 @@ a {
 
   .field-group textarea {
     min-height: 120px;
+  }
+
+  .meal-plan-card li {
+    grid-template-columns: minmax(0, 1fr) max-content 3.75rem;
+    gap: 0.55rem;
+  }
+
+  .meal-plan-card li .btn {
+    width: 3.75rem;
   }
 
   .filter-panel .btn,

@@ -151,8 +151,12 @@ async function fetchFoods() {
 
   try {
     foods.value = await getFoods(foodSearch.value.trim() ? { search: foodSearch.value.trim(), page_size: 50 } : { page_size: 50 })
-    if (!selectedFoodId.value && foods.value[0]) selectedFoodId.value = foods.value[0].id
-    if (!detailNewItem.foodId && foods.value[0]) detailNewItem.foodId = foods.value[0].id
+    if (!foods.value.some((food) => food.id === Number(selectedFoodId.value))) {
+      selectedFoodId.value = foods.value[0]?.id || ''
+    }
+    if (!foods.value.some((food) => food.id === Number(detailNewItem.foodId))) {
+      detailNewItem.foodId = foods.value[0]?.id || ''
+    }
   } catch (error) {
     errorMessage.value = normalizeCaughtError(error).message
   } finally {
@@ -426,6 +430,7 @@ onMounted(async () => {
         <div class="field-group">
           <label for="food-select">음식 선택</label>
           <select id="food-select" v-model="selectedFoodId">
+            <option value="">선택</option>
             <option v-for="food in foods" :key="food.id" :value="food.id">
               {{ food.name }} · {{ formatNumber(food.calories) }}kcal/100g
             </option>
@@ -629,6 +634,7 @@ onMounted(async () => {
             <div class="field-group" style="grid-column: span 5">
               <label for="detail-food">추가 음식</label>
               <select id="detail-food" v-model="detailNewItem.foodId">
+                <option value="">선택</option>
                 <option v-for="food in foods" :key="food.id" :value="food.id">{{ food.name }}</option>
               </select>
             </div>

@@ -128,8 +128,12 @@ async function fetchExercises() {
     exercises.value = await getWorkouts(search.value.trim() ? { search: search.value.trim(), page_size: 50 } : { page_size: 50 })
     if (route.query.exerciseId && exercises.value.some((exercise) => exercise.id === Number(route.query.exerciseId))) {
       form.exerciseId = Number(route.query.exerciseId)
-    } else if (!form.exerciseId && exercises.value[0]) {
-      form.exerciseId = exercises.value[0].id
+    } else if (!exercises.value.some((exercise) => exercise.id === Number(form.exerciseId))) {
+      form.exerciseId = exercises.value[0]?.id || ''
+    }
+
+    if (editForm.exerciseId && !exercises.value.some((exercise) => exercise.id === Number(editForm.exerciseId))) {
+      editForm.exerciseId = ''
     }
   } catch (error) {
     errorMessage.value = normalizeCaughtError(error).message
@@ -361,6 +365,7 @@ onMounted(async () => {
         <div class="field-group">
           <label for="exercise">운동</label>
           <select id="exercise" v-model="form.exerciseId">
+            <option value="">선택</option>
             <option v-for="exercise in exercises" :key="exercise.id" :value="exercise.id">{{ exercise.name }}</option>
           </select>
         </div>
@@ -445,6 +450,7 @@ onMounted(async () => {
           <div class="field-group">
             <label for="edit-exercise">운동</label>
             <select id="edit-exercise" v-model="editForm.exerciseId">
+              <option value="">선택</option>
               <option v-for="exercise in exercises" :key="exercise.id" :value="exercise.id">{{ exercise.name }}</option>
             </select>
             <span v-if="editingExercise" class="meta-text">{{ editingExercise.bodyParts.join(', ') }}</span>

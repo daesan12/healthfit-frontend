@@ -22,6 +22,9 @@ defineProps({
     <div>
       <h2>{{ title }}</h2>
       <p v-if="message">{{ message }}</p>
+      <div v-if="$slots.default" class="state-actions">
+        <slot />
+      </div>
     </div>
   </section>
 </template>

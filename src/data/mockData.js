@@ -1,8 +1,8 @@
 export const mockFoods = [
   {
     id: 1,
-    name: '시래기 된장국',
-    category: '국 및 탕류',
+    name: '시금치 된장국',
+    category: '국/탕류',
     calories: 11,
     carbohydrate: 1.6,
     protein: 0.7,
@@ -35,23 +35,23 @@ export const mockWorkouts = [
     bodyParts: ['가슴', '상완'],
     equipments: ['맨몸'],
     targetMuscles: ['대흉근', '삼두근'],
-    instructions: ['손을 어깨너비로 짚습니다.', '몸을 곧게 유지하며 팔을 굽혔다 폅니다.'],
+    instructions: ['손을 어깨너비로 짚습니다.', '몸을 곧게 유지하며 팔을 굽혔다가 밀어 올립니다.'],
   },
   {
     id: 2,
     name: '덤벨 로우',
     bodyParts: ['등'],
     equipments: ['덤벨'],
-    targetMuscles: ['광배근', '상부등'],
-    instructions: ['상체를 살짝 숙입니다.', '팔꿈치를 뒤로 당겨 덤벨을 들어 올립니다.'],
+    targetMuscles: ['광배근', '승모근'],
+    instructions: ['상체를 살짝 숙입니다.', '팔꿈치를 뒤로 당기며 덤벨을 들어 올립니다.'],
   },
   {
     id: 3,
     name: '스쿼트',
-    bodyParts: ['허벅지', '둔근'],
+    bodyParts: ['하체', '둔근'],
     equipments: ['맨몸'],
     targetMuscles: ['대퇴사두근', '둔근'],
-    instructions: ['발을 어깨너비로 벌립니다.', '무릎과 고관절을 굽혀 앉았다 일어납니다.'],
+    instructions: ['발을 어깨너비로 벌립니다.', '무릎과 고관절을 굽히며 앉았다가 일어납니다.'],
   },
 ]
 
@@ -77,9 +77,9 @@ export const mockPosts = [
   {
     id: 3,
     category: 'free',
-    title: '식단 기록 꾸준히 하는 팁',
+    title: '식단 기록 오래 하는 팁',
     author: 'steady',
-    preview: '처음부터 완벽히 기록하려고 하기보다 자주 먹는 음식부터 저장해두면 편합니다.',
+    preview: '처음부터 완벽하게 기록하기보다 자주 먹는 음식부터 저장하면 편합니다.',
     likes: 9,
     comments: 2,
   },
@@ -96,7 +96,7 @@ export const mockProgress = [
 export const mockDietRecommendation = {
   title: '감량 목표 고단백 하루 식단',
   reason:
-    '권장 칼로리 2,200kcal 안에서 단백질 비율을 높이고 조리 부담이 낮은 음식으로 구성했습니다.',
+    '권장 칼로리 2,200kcal 안에서 단백질 비율을 높이고 조리 부담이 적은 음식으로 구성했습니다.',
   totalCalories: 2085,
   totalCarbohydrate: 232,
   totalProtein: 158,
@@ -106,7 +106,7 @@ export const mockDietRecommendation = {
       mealType: '아침',
       foods: [
         { name: '현미밥', amount: 150, calories: 230 },
-        { name: '시래기 된장국', amount: 200, calories: 22 },
+        { name: '시금치 된장국', amount: 200, calories: 22 },
       ],
     },
     {
@@ -120,7 +120,7 @@ export const mockDietRecommendation = {
       mealType: '저녁',
       foods: [
         { name: '닭가슴살 구이', amount: 140, calories: 231 },
-        { name: '시래기 된장국', amount: 250, calories: 28 },
+        { name: '채소 샐러드', amount: 250, calories: 28 },
       ],
     },
     {
@@ -139,11 +139,11 @@ export const mockDietFeedback = {
   protein: 124,
   fat: 42,
   feedback:
-    '오늘 식단은 단백질 비율이 좋고 전체 칼로리는 목표보다 낮습니다. 저녁이나 간식에서 복합 탄수화물과 건강한 지방을 조금 보충하면 더 안정적인 감량 식단이 됩니다.',
+    '오늘 식단은 단백질 비율이 좋고 전체 칼로리는 목표보다 낮습니다. 간식에서 복합 탄수화물과 건강한 지방을 조금 보완하면 더 안정적인 감량 식단이 됩니다.',
   checks: [
-    { label: '단백질', status: '좋음', detail: '목표 대비 충분한 편입니다.' },
+    { label: '단백질', status: '좋음', detail: '목표 대비 충분한 섭취량입니다.' },
     { label: '칼로리', status: '부족', detail: '권장량보다 약 560kcal 낮습니다.' },
-    { label: '지방', status: '주의', detail: '지방 섭취가 낮아 견과류나 생선류 보충이 좋습니다.' },
+    { label: '지방', status: '주의', detail: '지방 섭취가 낮아 견과류나 생선을 보완하면 좋습니다.' },
   ],
 }
 
@@ -158,7 +158,7 @@ export const mockWorkoutRecommendation = {
     { workoutId: 3, name: '스쿼트', sets: 3, reps: 15, minutes: 12, order: 2 },
     { workoutId: 2, name: '덤벨 로우', sets: 3, reps: 12, minutes: 12, order: 3 },
   ],
-  cautions: ['운동 전 5분 이상 가볍게 몸을 풉니다.', '무릎이나 어깨 통증이 있으면 반복 횟수를 줄입니다.'],
+  cautions: ['운동 전 5분 이상 가볍게 몸을 풉니다.', '무릎이나 손목 통증이 있으면 반복 횟수를 줄입니다.'],
 }
 
 export const mockAiChats = [
@@ -171,7 +171,7 @@ export const mockAiChats = [
     id: 2,
     role: 'assistant',
     message:
-      '운동을 병행하는 감량 목표라면 체중 1kg당 약 1.6g 전후를 기준으로 잡고, 식단 기록의 총 단백질 섭취량을 함께 확인하는 것이 좋습니다.',
+      '운동을 병행하는 감량 목표라면 체중 1kg당 약 1.6g 전후를 기준으로 잡고, 식단 기록에서 하루 총 단백질 섭취량을 함께 확인하는 것이 좋습니다.',
   },
 ]
 
@@ -180,7 +180,7 @@ export const mockComments = [
     id: 1,
     postId: 1,
     author: 'fitmin',
-    content: '구성이 깔끔하네요. 점심 식단 참고해볼게요!',
+    content: '구성이 깔끔하네요. 점심 식단 참고할게요!',
     createdAt: '2026-06-19',
   },
   {

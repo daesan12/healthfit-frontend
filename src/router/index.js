@@ -26,6 +26,18 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/records',
+    name: 'records',
+    component: () => import('../views/RecordsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/body-records',
+    name: 'body-records',
+    component: () => import('../views/health/BodyRecordsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/diet',
     name: 'diet-dashboard',
     component: () => import('../views/diet/DietDashboardView.vue'),
@@ -43,9 +55,21 @@ const routes = [
     component: () => import('../views/diet/FoodSearchView.vue'),
   },
   {
+    path: '/saved-meals',
+    name: 'saved-meals',
+    component: () => import('../views/diet/SavedMealsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/diet/recommend',
     name: 'diet-recommend',
     component: () => import('../views/diet/DietRecommendView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/diet/recommendations/:id',
+    name: 'diet-recommendation-detail',
+    component: () => import('../views/diet/DietRecommendationDetailView.vue'),
     meta: { requiresAuth: true },
   },
   {
@@ -71,6 +95,30 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/workout/progression',
+    name: 'workout-progression',
+    component: () => import('../views/workout/WorkoutProgressionView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/workout/logs',
+    name: 'workout-logs',
+    component: () => import('../views/workout/WorkoutLogsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/workout/routines',
+    name: 'workout-routines',
+    component: () => import('../views/workout/WorkoutRoutinesView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/my-data',
+    name: 'my-data',
+    component: () => import('../views/manage/MyDataView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/progress',
     name: 'progress',
     component: () => import('../views/progress/ProgressView.vue'),
@@ -85,6 +133,11 @@ const routes = [
     path: '/posts/:id',
     name: 'post-detail',
     component: () => import('../views/community/PostDetailView.vue'),
+  },
+  {
+    path: '/users/:id',
+    name: 'public-profile',
+    component: () => import('../views/community/PublicProfileView.vue'),
   },
   {
     path: '/ai-chat',
@@ -102,16 +155,16 @@ const router = createRouter({
 router.beforeEach((to) => {
   const requiresAuth = to.matched.some((route) => route.meta.requiresAuth)
   const guestOnly = to.matched.some((route) => route.meta.guestOnly)
-  const hasToken = Boolean(localStorage.getItem('healthfit_access_token'))
+  const hasAccessToken = Boolean(localStorage.getItem('healthfit_access_token'))
 
-  if (requiresAuth && !hasToken) {
+  if (requiresAuth && !hasAccessToken) {
     return {
       name: 'login',
       query: { redirect: to.fullPath },
     }
   }
 
-  if (guestOnly && hasToken) {
+  if (guestOnly && hasAccessToken) {
     return { name: 'profile' }
   }
 

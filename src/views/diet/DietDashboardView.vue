@@ -141,9 +141,9 @@ onMounted(fetchDashboard)
         <div class="section-heading-row">
           <div>
             <p class="section-label">Macros</p>
-            <h2>오늘의 탄단지</h2>
+            <h2>오늘의 영양소</h2>
           </div>
-          <RouterLink class="text-link" to="/diet/records">기록 추가</RouterLink>
+          <!-- <RouterLink class="text-link" to="/diet/records">기록 추가</RouterLink> -->
         </div>
         <div v-for="row in macroRows" :key="row.label" class="macro-row">
           <span>{{ row.label }}</span>

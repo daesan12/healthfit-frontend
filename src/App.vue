@@ -15,7 +15,7 @@ const navItems = [
   { label: '기록', to: '/records' },
   { label: '진행 현황', to: '/progress' },
   { label: '커뮤니티', to: '/community' },
-  { label: '마이', to: '/profile' },
+  { label: '마이프로필', to: '/profile' },
 ]
 
 onMounted(async () => {

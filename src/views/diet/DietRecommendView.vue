@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
@@ -8,10 +8,12 @@ import {
   recommendDiet,
   replaceDietRecommendationFood,
   rerollDietRecommendation,
+  saveDietRecommendation,
 } from '@/api/diet'
 
 const targetDate = ref(new Date().toISOString().slice(0, 10))
 const mealCount = ref(3)
+const foodSource = ref('all')
 const preference = ref('고단백, 조리 간단한 한식 식단')
 const recommendation = ref(null)
 const isLoading = ref(false)
@@ -27,6 +29,33 @@ const replacementCondition = ref('비슷한 영양의 다른 음식으로 바꿔
 const rerollCondition = ref('기존 조건은 유지하고 조리가 더 쉬운 구성으로 다시 추천해줘')
 const saveForms = reactive({})
 const savingMealOrders = reactive({})
+const foodSourceOptions = [
+  {
+    value: 'all',
+    label: 'DB 음식 기준 추천',
+    description: 'HealthFit 음식 DB와 내 음식을 함께 후보로 사용합니다.',
+  },
+  {
+    value: 'my_fridge',
+    label: '내 음식 기준 추천',
+    description: '직접 추가한 내 음식만 후보로 사용합니다.',
+  },
+  {
+    value: 'free',
+    label: 'AI 자유 추천',
+    description: 'DB 후보 제한 없이 현실적인 식단을 자유롭게 추천합니다.',
+  },
+]
+
+const selectedFoodSourceOption = computed(() =>
+  foodSourceOptions.find((option) => option.value === foodSource.value) || foodSourceOptions[0],
+)
+
+const recommendationFoodSourceOption = computed(() =>
+  foodSourceOptions.find((option) => option.value === recommendation.value?.foodSource) || selectedFoodSourceOption.value,
+)
+
+const isFreeRecommendation = computed(() => recommendation.value?.foodSource === 'free')
 
 function buildDietRecommendationMessage() {
   const condition = preference.value.trim() || '균형 잡힌 건강 식단'
@@ -70,7 +99,7 @@ async function requestRecommendation() {
       scope: 'day',
       target_date: targetDate.value,
       meal_count: Number(mealCount.value || 1),
-      food_source: 'all',
+      food_source: foodSource.value,
       message: buildDietRecommendationMessage(),
       preference: preference.value,
     })
@@ -164,6 +193,31 @@ async function saveSelectedMeals() {
   }
 
   isSavingSelected.value = true
+
+  if (isFreeRecommendation.value) {
+    let savedCount = 0
+
+    try {
+      for (const meal of selectedMeals) {
+        const form = saveForms[meal.mealOrder]
+        await saveDietRecommendation(recommendation.value.id, {
+          save_target: 'saved_meal',
+          meal_orders: [meal.mealOrder],
+          title: form?.title?.trim() || meal.mealType || recommendation.value.title,
+          description: form?.description?.trim() || preference.value,
+        })
+        savedCount += 1
+        if (form) form.message = '????앸떒?쇰줈 ??ν뻽?듬땲??'
+      }
+      saveMessage.value = `${selectedMeals.length}개 AI 자유 추천 식사를 저장 식단으로 저장했습니다.`
+    } catch (error) {
+      saveMessage.value = normalizeCaughtError(error).message
+    } finally {
+      isSavingSelected.value = false
+    }
+    return
+  }
+
   let savedCount = 0
 
   try {
@@ -241,6 +295,16 @@ watch(recommendation, (nextRecommendation) => {
         </div>
 
         <div class="field-group">
+          <label for="food-source">음식 소스</label>
+          <select id="food-source" v-model="foodSource">
+            <option v-for="option in foodSourceOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+          <span class="meta-text">{{ selectedFoodSourceOption.description }}</span>
+        </div>
+
+        <div class="field-group">
           <label for="preference">선호 조건</label>
           <textarea id="preference" v-model="preference" />
         </div>
@@ -276,7 +340,10 @@ watch(recommendation, (nextRecommendation) => {
               <p class="section-label">Recommendation</p>
               <h2>{{ recommendation.title }}</h2>
             </div>
-            <span class="chip">{{ recommendation.meals.length }}끼</span>
+            <div class="chip-list">
+              <span class="chip">{{ recommendation.meals.length }}끼</span>
+              <span class="badge badge-ai">{{ recommendationFoodSourceOption.label }}</span>
+            </div>
           </div>
 
           <div class="save-options-panel">
@@ -373,7 +440,13 @@ watch(recommendation, (nextRecommendation) => {
 
           <div class="save-options-panel">
             <p class="section-label">선택한 식사 저장</p>
-            <p class="meta-text">체크한 식사들을 한 번에 저장 식단 목록에 추가합니다.</p>
+            <p class="meta-text">
+              {{
+                isFreeRecommendation
+                  ? 'AI 자유 추천은 선택한 식사를 스냅샷 음식 기반 저장 식단으로 저장합니다.'
+                  : '체크한 식사들을 한 번에 저장 식단 목록에 추가합니다.'
+              }}
+            </p>
             <button class="btn btn-primary" type="button" :disabled="isSavingSelected" @click="saveSelectedMeals">
               {{ isSavingSelected ? '저장 중...' : '선택한 식사 저장' }}
             </button>

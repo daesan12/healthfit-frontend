@@ -153,6 +153,7 @@ function startEditSavedMeal(meal) {
   form.items = meal.items.map((item) => ({
     id: item.id,
     foodId: item.foodId,
+    aiFoodKey: item.aiFoodKey,
     foodName: item.foodName,
     amount: item.amount,
     calories: item.calories,
@@ -170,10 +171,21 @@ async function submitSavedMeal() {
     return
   }
 
+  const payloadItems = form.items.map((item) => ({
+    foodId: item.foodId ? Number(item.foodId) : null,
+    aiFoodKey: item.aiFoodKey || null,
+    amount: Number(item.amount || 0),
+  }))
+
+  if (payloadItems.some((item) => !item.foodId && !item.aiFoodKey)) {
+    message.value = 'AI 자유 음식 정보가 누락되었습니다. 목록을 새로고침한 뒤 다시 수정해주세요.'
+    return
+  }
+
   const payload = {
     name: form.name.trim(),
     description: form.description.trim(),
-    items: form.items.map((item) => ({ foodId: Number(item.foodId), amount: Number(item.amount || 0) })),
+    items: payloadItems,
   }
 
   try {
@@ -275,7 +287,10 @@ onMounted(() => {
           <article v-for="item in form.items" :key="item.id" class="meal-item">
             <div>
               <strong>{{ item.foodName }}</strong>
-              <span>{{ item.amount }}g · {{ Number(item.calories || 0).toFixed(1) }} kcal</span>
+              <span>
+                {{ item.amount }}g · {{ Number(item.calories || 0).toFixed(1) }} kcal
+                <template v-if="item.aiFoodKey"> · AI 자유 음식</template>
+              </span>
             </div>
             <button type="button" @click="removeItemFromForm(item.id)">제외</button>
           </article>
@@ -350,6 +365,7 @@ onMounted(() => {
             <ul>
               <li v-for="item in meal.items" :key="item.id">
                 {{ item.foodName }} {{ item.amount }}g · {{ item.calories }} kcal
+                <span v-if="item.aiFoodKey" class="badge badge-ai">AI 자유 음식</span>
               </li>
             </ul>
             <div class="button-row">

@@ -1,14 +1,17 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { askAi, getAiChatsPage } from '@/api/ai'
 import { normalizeCaughtError } from '@/api/client'
 
-const question = ref('오늘 식단에서 부족한 점을 알려줘')
+const question = ref('')
 const chats = ref([])
 const isLoading = ref(false)
 const errorMessage = ref('')
+const chatScroll = ref(null)
+const messageEnd = ref(null)
+const questionInput = ref(null)
 
 const pagination = reactive({
   page: 1,
@@ -97,6 +100,21 @@ function toChatItems(apiChat) {
   ]
 }
 
+async function scrollToLatest({ focusInput = false } = {}) {
+  await nextTick()
+  messageEnd.value?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+
+  if (focusInput) {
+    questionInput.value?.focus()
+  }
+}
+
+function handleComposerKeydown(event) {
+  if (event.key !== 'Enter' || event.shiftKey) return
+  event.preventDefault()
+  askQuestion()
+}
+
 async function loadChats(page = pagination.page) {
   errorMessage.value = ''
 
@@ -107,6 +125,7 @@ async function loadChats(page = pagination.page) {
       .reverse()
       .flatMap(toChatItems)
     syncPagination(data)
+    await scrollToLatest({ focusInput: true })
   } catch (error) {
     errorMessage.value = normalizeCaughtError(error).message
   }
@@ -129,6 +148,7 @@ async function askQuestion() {
   })
   question.value = ''
   isLoading.value = true
+  await scrollToLatest()
 
   try {
     const answer = await askAi({ question: currentQuestion })
@@ -146,37 +166,43 @@ async function askQuestion() {
         { label: '진행 현황 보기', to: '/progress' },
       ],
     })
+    await scrollToLatest({ focusInput: true })
   } finally {
     isLoading.value = false
+    await scrollToLatest({ focusInput: true })
   }
 }
 
-onMounted(() => loadChats(1))
+onMounted(async () => {
+  await loadChats(1)
+  await scrollToLatest({ focusInput: true })
+})
 </script>
 
 <template>
-  <main class="page-shell">
-    <PageHeader
-      eyebrow="AI Chat"
-      title="AI 질문 답변"
-      description="식단, 운동, 영양 질문을 HealthFit PT 코치에게 물어보고 관련 기록 화면으로 이어갑니다."
-    />
+  <main class="ai-chat-page">
+    <section class="ai-chat-shell">
+      <div class="ai-chat-topbar">
+        <PageHeader
+          eyebrow="AI Chat"
+          title="AI 상담"
+          description="식단, 운동, 영양 질문을 HealthFit PT 코치에게 물어보세요."
+        />
+        <span class="chip">{{ resultSummary }}</span>
+      </div>
 
-    <section class="content-grid">
-      <section class="surface-card chat-panel" style="grid-column: span 8">
-        <div class="section-heading-row">
-          <div>
-            <p class="section-label">History</p>
-            <h2>최근 AI 대화</h2>
-          </div>
-          <span class="chip">{{ resultSummary }}</span>
+      <section ref="chatScroll" class="chat-panel ai-chat-thread" aria-live="polite">
+        <div v-if="chats.length === 0 && !isLoading" class="ai-chat-empty">
+          <span class="status-badge">PT 코치</span>
+          <h2>무엇이든 물어보세요</h2>
+          <p>식단 점검, 운동 루틴, 영양 균형처럼 HealthFit 데이터와 연결되는 질문을 도와드릴게요.</p>
         </div>
 
         <article
           v-for="chat in chats"
           :key="chat.id"
           class="chat-message"
-          :class="{ 'is-user': chat.role === 'user' }"
+          :class="{ 'is-user': chat.role === 'user', 'is-assistant': chat.role === 'assistant' }"
         >
           <span>{{ chat.role === 'user' ? '나' : 'HealthFit AI' }}</span>
           <p>{{ chat.message }}</p>
@@ -188,6 +214,20 @@ onMounted(() => loadChats(1))
           </div>
         </article>
 
+        <StateBlock
+          v-if="isLoading"
+          type="loading"
+          title="AI 답변 준비 중"
+          message="서버에서 PT 코치 답변을 생성하고 있습니다."
+        />
+
+        <StateBlock
+          v-if="errorMessage"
+          type="error"
+          title="질문을 보낼 수 없습니다"
+          :message="errorMessage"
+        />
+
         <div v-if="pagination.totalPages > 1" class="pagination-panel">
           <button class="btn btn-secondary" type="button" :disabled="!pagination.hasPrevious" @click="loadChats(pagination.page - 1)">
             이전
@@ -198,41 +238,23 @@ onMounted(() => loadChats(1))
           </button>
         </div>
 
-        <StateBlock
-          v-if="isLoading"
-          type="loading"
-          title="AI 답변 준비 중"
-          message="서버에서 PT 코치 답변을 생성하고 있습니다."
-        />
-
-        <StateBlock
-          v-if="!isLoading && chats.length === 0"
-          type="empty"
-          title="아직 대화가 없습니다"
-          message="오른쪽 입력창에서 첫 질문을 보내보세요."
-        />
+        <div ref="messageEnd" class="message-end" aria-hidden="true" />
       </section>
 
-      <form class="form-card" style="grid-column: span 4; align-self: start" @submit.prevent="askQuestion">
-        <div class="ai-status-banner">
-          <span class="status-badge">PT 코치</span>
-          <p>최근 대화 기록을 기반으로 답변하고, 질문과 답변은 자동 저장됩니다.</p>
+      <form class="ai-composer" @submit.prevent="askQuestion">
+        <button class="composer-tool" type="button" aria-label="새 질문">AI</button>
+        <div class="composer-input-wrap">
+          <textarea
+            id="question"
+            ref="questionInput"
+            v-model="question"
+            rows="1"
+            placeholder="무엇이든 물어보세요"
+            @keydown="handleComposerKeydown"
+          />
         </div>
-
-        <div class="field-group">
-          <label for="question">질문</label>
-          <textarea id="question" v-model="question" />
-        </div>
-
-        <StateBlock
-          v-if="errorMessage"
-          type="error"
-          title="질문을 보낼 수 없습니다"
-          :message="errorMessage"
-        />
-
-        <button class="btn btn-primary" type="submit" :disabled="isLoading">
-          {{ isLoading ? '답변 대기 중...' : 'AI에게 질문하기' }}
+        <button class="composer-send" type="submit" :disabled="isLoading || !question.trim()" aria-label="질문 보내기">
+          {{ isLoading ? '...' : '↑' }}
         </button>
       </form>
     </section>

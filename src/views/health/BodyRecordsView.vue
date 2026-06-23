@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
@@ -23,6 +24,7 @@ const deletingId = ref(null)
 const pendingDeleteId = ref(null)
 const formMessage = ref('')
 const errorMessage = ref('')
+const isRecordModalOpen = ref(false)
 const pagination = reactive({
   count: 0,
   page: 1,
@@ -49,6 +51,16 @@ function syncPagination(data) {
 function formatValue(value, unit) {
   if (value === null || value === undefined || value === '') return '미입력'
   return `${Number(value).toFixed(1)}${unit}`
+}
+
+function openRecordModal() {
+  formMessage.value = ''
+  isRecordModalOpen.value = true
+}
+
+function closeRecordModal() {
+  formMessage.value = ''
+  isRecordModalOpen.value = false
 }
 
 async function fetchRecords(page = 1) {
@@ -90,6 +102,7 @@ async function saveRecord() {
     formMessage.value = '신체 기록이 저장되었습니다.'
     toastStore.success('신체 기록 저장 완료', '진행 현황에서 변화를 확인할 수 있습니다.')
     await fetchRecords(1)
+    isRecordModalOpen.value = false
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   } finally {
@@ -130,14 +143,17 @@ onMounted(() => fetchRecords(1))
 
 <template>
   <main class="page-shell">
-    <PageHeader
-      eyebrow="Health"
-      title="신체 기록"
-      description="체중, 체지방률, 골격근량 기록을 진행 현황에 반영합니다."
-    />
+    <div class="page-header-row">
+      <PageHeader
+        eyebrow="Health"
+        title="신체 기록"
+        description="체중, 체지방률, 골격근량 기록을 진행 현황에 반영합니다."
+      />
+      <button class="btn btn-primary page-action" type="button" @click="openRecordModal">신체 기록 추가</button>
+    </div>
 
-    <section class="content-grid">
-      <form class="form-card" style="grid-column: span 5; align-self: start" @submit.prevent="saveRecord">
+    <BaseModal :open="isRecordModalOpen" title="신체 기록 추가" @close="closeRecordModal">
+      <form class="form-card modal-form" @submit.prevent="saveRecord">
         <div class="field-group">
           <label for="record-date">기록 날짜</label>
           <input id="record-date" v-model="form.recordDate" type="date" />
@@ -161,16 +177,22 @@ onMounted(() => fetchRecords(1))
         <button class="btn btn-primary" type="submit" :disabled="isSaving">
           {{ isSaving ? '저장 중...' : '신체 기록 저장' }}
         </button>
+        <button class="btn btn-secondary" type="button" @click="closeRecordModal">취소</button>
         <p v-if="formMessage" class="form-message">{{ formMessage }}</p>
       </form>
+    </BaseModal>
 
-      <section class="surface-card" style="grid-column: span 7">
+    <section class="content-grid">
+      <section class="surface-card body-record-panel" style="grid-column: 1 / -1">
         <div class="section-heading-row">
           <div>
             <p class="section-label">Records</p>
             <h2>최근 신체 기록</h2>
           </div>
-          <span class="chip">{{ resultSummary }}</span>
+          <div class="chip-list">
+            <span class="badge badge-body">{{ resultSummary }}</span>
+            <button class="btn btn-ghost" type="button" @click="openRecordModal">기록 추가</button>
+          </div>
         </div>
 
         <StateBlock
@@ -225,9 +247,9 @@ onMounted(() => fetchRecords(1))
             v-if="records.length === 0"
             type="empty"
             title="저장된 신체 기록이 없습니다"
-            message="왼쪽 폼에서 오늘의 신체 정보를 기록해보세요."
+            message="오늘의 신체 정보를 기록해보세요."
           >
-            <a class="btn btn-primary" href="#weight">신체 정보 입력하기</a>
+            <button class="btn btn-primary" type="button" @click="openRecordModal">신체 정보 입력하기</button>
             <RouterLink class="btn btn-secondary" to="/progress">진행 현황 보기</RouterLink>
           </StateBlock>
         </div>

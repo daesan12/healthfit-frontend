@@ -24,6 +24,7 @@ export function mapMeal(apiMeal) {
     mealItems: (apiMeal.meal_items || []).map((item) => ({
       id: item.id,
       foodId: item.food_id,
+      aiFoodKey: item.ai_food_key || null,
       foodName: item.food_name,
       amount: Number(item.amount || 0),
       calories: Number(item.calories || 0),
@@ -46,6 +47,7 @@ export function mapSavedMeal(apiSavedMeal) {
     items: (apiSavedMeal.saved_meal_items || apiSavedMeal.items || []).map((item) => ({
       id: item.id,
       foodId: item.food_id,
+      aiFoodKey: item.ai_food_key || null,
       foodName: item.food_name,
       amount: Number(item.amount || 0),
       calories: Number(item.calories || 0),

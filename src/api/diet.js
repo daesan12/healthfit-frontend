@@ -141,10 +141,12 @@ function toSavedMealPayload(savedMeal) {
   return {
     name: savedMeal.name,
     description: savedMeal.description,
-    items: (savedMeal.items || []).map((item) => ({
-      food_id: item.foodId,
-      amount: item.amount,
-    })),
+    items: (savedMeal.items || []).map((item) => {
+      const payload = { amount: item.amount }
+      if (item.foodId) payload.food_id = item.foodId
+      if (item.aiFoodKey) payload.ai_food_key = item.aiFoodKey
+      return payload
+    }),
   }
 }
 

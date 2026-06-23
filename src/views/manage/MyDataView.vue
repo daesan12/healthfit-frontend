@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
@@ -13,6 +14,8 @@ const errorMessage = ref('')
 const isLoading = ref(false)
 const editingFoodId = ref(null)
 const editingExerciseId = ref(null)
+const isFoodModalOpen = ref(false)
+const isExerciseModalOpen = ref(false)
 
 const emptyFoodForm = {
   name: '',
@@ -44,6 +47,26 @@ function resetFoodForm() {
 function resetExerciseForm() {
   Object.assign(exerciseForm, emptyExerciseForm)
   editingExerciseId.value = null
+}
+
+function openFoodModal() {
+  resetFoodForm()
+  isFoodModalOpen.value = true
+}
+
+function openExerciseModal() {
+  resetExerciseForm()
+  isExerciseModalOpen.value = true
+}
+
+function closeFoodModal() {
+  resetFoodForm()
+  isFoodModalOpen.value = false
+}
+
+function closeExerciseModal() {
+  resetExerciseForm()
+  isExerciseModalOpen.value = false
 }
 
 function listToText(value) {
@@ -78,6 +101,7 @@ function startEditFood(food) {
     protein: food.protein,
     fat: food.fat,
   })
+  isFoodModalOpen.value = true
 }
 
 function startEditExercise(exercise) {
@@ -91,6 +115,7 @@ function startEditExercise(exercise) {
     secondaryMuscles: listToText(exercise.secondaryMuscles),
     instructions: listToText(exercise.instructions),
   })
+  isExerciseModalOpen.value = true
 }
 
 async function submitFood() {
@@ -106,6 +131,7 @@ async function submitFood() {
     }
 
     resetFoodForm()
+    isFoodModalOpen.value = false
     await fetchData()
   } catch (error) {
     message.value = normalizeCaughtError(error).message
@@ -125,6 +151,7 @@ async function submitExercise() {
     }
 
     resetExerciseForm()
+    isExerciseModalOpen.value = false
     await fetchData()
   } catch (error) {
     message.value = normalizeCaughtError(error).message
@@ -158,17 +185,23 @@ onMounted(fetchData)
 
 <template>
   <main class="page-shell">
-    <PageHeader
-      eyebrow="My Data"
-      title="내 음식·운동 관리"
-      description="직접 추가한 음식과 운동을 만들고 수정하고 삭제합니다."
-    />
+    <div class="page-header-row">
+      <PageHeader
+        eyebrow="My Data"
+        title="내 음식·운동 관리"
+        description="직접 추가한 음식과 운동을 만들고 수정하고 삭제합니다."
+      />
+      <div class="button-row page-action">
+        <button class="btn btn-primary" type="button" @click="openFoodModal">음식 추가</button>
+        <button class="btn btn-secondary" type="button" @click="openExerciseModal">운동 추가</button>
+      </div>
+    </div>
 
     <StateBlock v-if="errorMessage" type="error" title="데이터를 불러오지 못했습니다" :message="errorMessage" />
     <p v-if="message" class="form-message">{{ message }}</p>
 
-    <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4" @submit.prevent="submitFood">
+    <BaseModal :open="isFoodModalOpen" :title="editingFoodId ? '음식 수정' : '음식 추가'" @close="closeFoodModal">
+      <form class="form-card modal-form" @submit.prevent="submitFood">
         <p class="section-label">Food</p>
         <h2>{{ editingFoodId ? '음식 수정' : '음식 추가' }}</h2>
         <div class="field-group">
@@ -197,11 +230,13 @@ onMounted(fetchData)
         </div>
         <div class="button-row">
           <button class="btn btn-primary" type="submit">{{ editingFoodId ? '음식 수정' : '음식 추가' }}</button>
-          <button v-if="editingFoodId" class="btn btn-secondary" type="button" @click="resetFoodForm">취소</button>
+          <button class="btn btn-secondary" type="button" @click="closeFoodModal">취소</button>
         </div>
       </form>
+    </BaseModal>
 
-      <form class="form-card" style="grid-column: span 4" @submit.prevent="submitExercise">
+    <BaseModal :open="isExerciseModalOpen" :title="editingExerciseId ? '운동 수정' : '운동 추가'" @close="closeExerciseModal">
+      <form class="form-card modal-form" @submit.prevent="submitExercise">
         <p class="section-label">Exercise</p>
         <h2>{{ editingExerciseId ? '운동 수정' : '운동 추가' }}</h2>
         <div class="field-group">
@@ -234,37 +269,67 @@ onMounted(fetchData)
         </div>
         <div class="button-row">
           <button class="btn btn-primary" type="submit">{{ editingExerciseId ? '운동 수정' : '운동 추가' }}</button>
-          <button v-if="editingExerciseId" class="btn btn-secondary" type="button" @click="resetExerciseForm">취소</button>
+          <button class="btn btn-secondary" type="button" @click="closeExerciseModal">취소</button>
         </div>
       </form>
+    </BaseModal>
 
-      <section class="surface-card" style="grid-column: span 4">
-        <p class="section-label">내 데이터</p>
+    <section class="content-grid">
+      <section class="surface-card data-management-panel" style="grid-column: 1 / -1">
+        <div class="section-heading-row">
+          <div>
+            <p class="section-label">내 데이터</p>
+            <h2>직접 만든 음식과 운동</h2>
+          </div>
+          <div class="chip-list">
+            <span class="badge badge-diet">음식 {{ foods.length }}</span>
+            <span class="badge badge-workout">운동 {{ exercises.length }}</span>
+          </div>
+        </div>
+
         <StateBlock v-if="isLoading" type="loading" title="조회 중" message="내 음식과 운동을 불러오고 있습니다." />
         <template v-else>
-          <h2>내 음식</h2>
-          <article v-for="food in foods" :key="food.id" class="comment-item">
-            <div>
-              <strong>{{ food.name }}</strong>
-              <p>{{ food.calories }} kcal · {{ food.category }}</p>
-            </div>
-            <div class="button-row">
-              <button type="button" @click="startEditFood(food)">수정</button>
-              <button type="button" @click="removeFood(food.id)">삭제</button>
-            </div>
-          </article>
+          <div class="data-list-grid">
+            <section class="glass-card data-list-section">
+              <div class="section-heading-row">
+                <h3>내 음식</h3>
+                <button class="btn btn-ghost" type="button" @click="openFoodModal">추가</button>
+              </div>
+              <article v-for="food in foods" :key="food.id" class="comment-item list-card">
+                <div>
+                  <strong>{{ food.name }}</strong>
+                  <p>{{ food.calories }} kcal · {{ food.category }}</p>
+                </div>
+                <div class="button-row">
+                  <button class="btn btn-secondary" type="button" @click="startEditFood(food)">수정</button>
+                  <button class="btn btn-danger" type="button" @click="removeFood(food.id)">삭제</button>
+                </div>
+              </article>
+              <StateBlock v-if="foods.length === 0" type="empty" title="내 음식이 없습니다" message="직접 사용하는 음식을 추가해보세요.">
+                <button class="btn btn-primary" type="button" @click="openFoodModal">음식 추가</button>
+              </StateBlock>
+            </section>
 
-          <h2>내 운동</h2>
-          <article v-for="exercise in exercises" :key="exercise.id" class="comment-item">
-            <div>
-              <strong>{{ exercise.name }}</strong>
-              <p>{{ (exercise.bodyParts || []).join(', ') || '부위 없음' }}</p>
-            </div>
-            <div class="button-row">
-              <button type="button" @click="startEditExercise(exercise)">수정</button>
-              <button type="button" @click="removeExercise(exercise.id)">삭제</button>
-            </div>
-          </article>
+            <section class="glass-card data-list-section">
+              <div class="section-heading-row">
+                <h3>내 운동</h3>
+                <button class="btn btn-ghost" type="button" @click="openExerciseModal">추가</button>
+              </div>
+              <article v-for="exercise in exercises" :key="exercise.id" class="comment-item list-card">
+                <div>
+                  <strong>{{ exercise.name }}</strong>
+                  <p>{{ (exercise.bodyParts || []).join(', ') || '부위 없음' }}</p>
+                </div>
+                <div class="button-row">
+                  <button class="btn btn-secondary" type="button" @click="startEditExercise(exercise)">수정</button>
+                  <button class="btn btn-danger" type="button" @click="removeExercise(exercise.id)">삭제</button>
+                </div>
+              </article>
+              <StateBlock v-if="exercises.length === 0" type="empty" title="내 운동이 없습니다" message="루틴에 사용할 운동을 추가해보세요.">
+                <button class="btn btn-primary" type="button" @click="openExerciseModal">운동 추가</button>
+              </StateBlock>
+            </section>
+          </div>
         </template>
       </section>
     </section>

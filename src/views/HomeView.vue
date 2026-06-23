@@ -12,8 +12,9 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 
 const highlights = [
-  { value: '2,322', label: '음식 데이터' },
-  { value: '415', label: '운동 데이터' },
+  { value: '2,322', label: '음식 데이터', tone: 'diet' },
+  { value: '415', label: '운동 데이터', tone: 'workout' },
+  { value: 'AI', label: '맞춤 추천 엔진', tone: 'ai' },
 ]
 
 const todayCards = computed(() => [
@@ -23,6 +24,7 @@ const todayCards = computed(() => [
     hint: `${progress.value?.mealSummary.mealCount || 0}개 식단 기록`,
     to: '/diet/records',
     action: '식단 기록',
+    tone: 'diet',
   },
   {
     label: '오늘 운동',
@@ -30,6 +32,7 @@ const todayCards = computed(() => [
     hint: `${progress.value?.workoutSummary.workoutCount || 0}개 운동 기록`,
     to: '/workout/logs',
     action: '운동 기록',
+    tone: 'workout',
   },
   {
     label: '체중 변화',
@@ -39,6 +42,7 @@ const todayCards = computed(() => [
       : '오늘 신체 기록을 남겨보세요.',
     to: '/body-records',
     action: '신체 기록',
+    tone: 'body',
   },
 ])
 
@@ -74,10 +78,10 @@ onMounted(fetchTodayProgress)
   <main class="home-page">
     <section class="hero-section home-dashboard-hero">
       <div class="hero-copy">
-        <p class="section-label">AI 맞춤 식단·운동 추천 서비스</p>
-        <h1>오늘의 기록으로 내일의 루틴을 만드는 HealthFit</h1>
+        <p class="section-label">Premium AI Health Dashboard</p>
+        <h1>오늘의 기록으로 내 몸에 맞는 루틴을 설계하세요</h1>
         <p class="hero-description">
-          식단, 운동, 신체 기록을 한곳에 모으고 진행 현황에서 변화를 확인하는 건강 관리 플랫폼입니다.
+          식단, 운동, 신체 지표를 한 화면에서 관리하고 AI 추천으로 다음 선택을 더 선명하게 만드는 HealthFit입니다.
         </p>
 
         <div class="hero-actions">
@@ -88,7 +92,7 @@ onMounted(fetchTodayProgress)
         </div>
       </div>
 
-      <section class="today-panel" aria-label="Today dashboard">
+      <section class="today-panel dashboard-card" aria-label="Today dashboard">
         <div class="section-heading-row">
           <div>
             <p class="section-label">Today</p>
@@ -100,7 +104,7 @@ onMounted(fetchTodayProgress)
         <p v-if="errorMessage" class="form-message">{{ errorMessage }}</p>
 
         <template v-if="authStore.isAuthenticated">
-          <article v-for="card in todayCards" :key="card.label" class="today-card">
+          <article v-for="card in todayCards" :key="card.label" class="today-card" :class="`is-${card.tone}`">
             <div>
               <span>{{ card.label }}</span>
               <strong>{{ isLoading ? '조회 중...' : card.value }}</strong>
@@ -111,7 +115,7 @@ onMounted(fetchTodayProgress)
         </template>
 
         <template v-else>
-          <article class="today-card">
+          <article class="today-card is-diet">
             <div>
               <span>1단계</span>
               <strong>프로필 입력</strong>
@@ -119,7 +123,7 @@ onMounted(fetchTodayProgress)
             </div>
             <RouterLink class="btn btn-secondary" to="/signup">회원가입</RouterLink>
           </article>
-          <article class="today-card">
+          <article class="today-card is-workout">
             <div>
               <span>2단계</span>
               <strong>기록 남기기</strong>
@@ -132,7 +136,7 @@ onMounted(fetchTodayProgress)
     </section>
 
     <section class="stats-grid" aria-label="Project data summary">
-      <article v-for="item in highlights" :key="item.label">
+      <article v-for="item in highlights" :key="item.label" :class="`is-${item.tone}`">
         <strong>{{ item.value }}</strong>
         <span>{{ item.label }}</span>
       </article>

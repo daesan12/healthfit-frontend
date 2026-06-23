@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { normalizeCaughtError } from '@/api/client'
@@ -36,6 +37,7 @@ const formMessage = ref('')
 const listErrorMessage = ref('')
 const deletingPostId = ref(null)
 const pendingDeletePostId = ref(null)
+const isCreateModalOpen = ref(false)
 
 const posts = computed(() => communityStore.posts)
 const pagination = computed(() => communityStore.pagination)
@@ -130,6 +132,16 @@ function resetDraft() {
   draftPost.sharedWorkoutRoutineId = ''
 }
 
+function openCreateModal() {
+  formMessage.value = ''
+  isCreateModalOpen.value = true
+}
+
+function closeCreateModal() {
+  isCreateModalOpen.value = false
+  formMessage.value = ''
+}
+
 async function createDraftPost() {
   formMessage.value = ''
 
@@ -167,6 +179,7 @@ async function createDraftPost() {
     formMessage.value = '게시글을 작성했습니다.'
     toastStore.success('게시글 작성 완료', '커뮤니티 목록에 게시글을 추가했습니다.')
     await fetchPosts()
+    closeCreateModal()
   } catch (error) {
     formMessage.value = normalizeCaughtError(error).message
   }
@@ -216,14 +229,17 @@ onMounted(() => {
 
 <template>
   <main class="page-shell">
-    <PageHeader
-      eyebrow="Community"
-      title="커뮤니티"
-      description="식단, 운동 루틴, 기록 경험을 게시글로 공유합니다."
-    />
+    <div class="page-header-row">
+      <PageHeader
+        eyebrow="Community"
+        title="커뮤니티"
+        description="식단, 운동 루틴, 기록 경험을 게시글로 공유합니다."
+      />
+      <button class="btn btn-primary page-action" type="button" @click="openCreateModal">게시글 작성</button>
+    </div>
 
-    <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4; align-self: start" @submit.prevent="createDraftPost">
+    <BaseModal :open="isCreateModalOpen" title="게시글 작성" @close="closeCreateModal">
+      <form class="form-card modal-form" @submit.prevent="createDraftPost">
         <div class="field-group">
           <label for="post-title">제목</label>
           <input id="post-title" v-model="draftPost.title" type="text" placeholder="오늘의 식단 공유" />
@@ -278,9 +294,11 @@ onMounted(() => {
           {{ communityStore.isLoading ? '처리 중...' : '게시글 작성' }}
         </button>
       </form>
+    </BaseModal>
 
-      <section class="post-list" style="grid-column: span 8">
-        <form class="surface-card filter-panel" @submit.prevent="searchPosts">
+    <section class="community-layout">
+      <section class="post-list">
+        <form class="surface-card filter-panel search-panel" @submit.prevent="searchPosts">
           <div class="field-group">
             <label for="community-search">게시글 검색</label>
             <input id="community-search" v-model="filters.search" type="text" placeholder="제목 또는 내용 검색" />
@@ -302,7 +320,10 @@ onMounted(() => {
         </form>
 
         <div class="section-toolbar">
-          <p class="section-label">게시글 목록</p>
+          <div>
+            <p class="section-label">게시글 목록</p>
+            <h2>HealthFit 피드</h2>
+          </div>
           <strong>{{ resultSummary }}</strong>
         </div>
 
@@ -321,20 +342,22 @@ onMounted(() => {
         />
 
         <template v-else>
-          <article v-for="post in posts" :key="post.id" class="surface-card">
+          <article v-for="post in posts" :key="post.id" class="surface-card feed-card">
             <div class="section-heading-row">
               <div>
-                <span class="chip">{{ categoryLabel(post.category) }}</span>
-                <span v-if="post.sharedType" class="chip">{{ sharedLabel(post) }}</span>
+                <span class="badge" :class="`badge-${post.category}`">{{ categoryLabel(post.category) }}</span>
+                <span v-if="post.sharedType" class="badge badge-share">{{ sharedLabel(post) }}</span>
                 <h2>{{ post.title }}</h2>
               </div>
-              <RouterLink v-if="post.authorId" class="chip" :to="`/users/${post.authorId}`">{{ post.author }}</RouterLink>
-              <span v-else class="chip">{{ post.author }}</span>
+              <RouterLink v-if="post.authorId" class="chip author-chip" :to="`/users/${post.authorId}`">{{ post.author }}</RouterLink>
+              <span v-else class="chip author-chip">{{ post.author }}</span>
             </div>
             <p class="card-description">{{ post.preview }}</p>
-            <p class="meta-text">
-              작성자 {{ post.author }} · 좋아요 {{ post.likes }} · 댓글 {{ post.comments }}
-            </p>
+            <div class="post-meta">
+              <span>작성자 {{ post.author }}</span>
+              <span>좋아요 {{ post.likes }}</span>
+              <span>댓글 {{ post.comments }}</span>
+            </div>
             <div class="button-row">
               <RouterLink class="btn btn-secondary" :to="`/posts/${post.id}`">
                 상세 보기
@@ -393,7 +416,7 @@ onMounted(() => {
             message="검색 조건을 바꾸거나 첫 게시글을 작성해보세요."
           >
             <button class="btn btn-secondary" type="button" @click="resetFilters">검색 초기화</button>
-            <a class="btn btn-primary" href="#post-title">게시글 작성하기</a>
+            <button class="btn btn-primary" type="button" @click="openCreateModal">게시글 작성하기</button>
           </StateBlock>
         </template>
       </section>

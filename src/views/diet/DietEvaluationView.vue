@@ -69,8 +69,8 @@ onMounted(loadFeedbackHistory)
       description="선택한 날짜의 식단 기록을 기준으로 점수, 근거, 권장 섭취량 대비 현재 섭취량을 확인합니다."
     />
 
-    <section class="content-grid">
-      <form class="form-card" style="grid-column: span 4" @submit.prevent="requestEvaluation">
+    <section class="content-grid diet-evaluation-grid">
+      <form class="form-card evaluation-control-card" @submit.prevent="requestEvaluation">
         <div class="field-group">
           <label for="evaluation-date">평가 날짜</label>
           <input id="evaluation-date" v-model="targetDate" type="date" @change="loadFeedbackHistory" />
@@ -88,15 +88,15 @@ onMounted(loadFeedbackHistory)
           :message="requestMessage"
         />
 
-        <section class="preview-panel">
+        <!-- <section class="preview-panel">
           <p class="section-label">평가 기록</p>
           <strong>{{ feedbackHistory.length }}개</strong>
           <span v-if="feedbackHistory[0]">최근 평가 {{ feedbackHistory[0].score }}점 · {{ feedbackHistory[0].createdAt?.slice(0, 10) }}</span>
           <span v-else>{{ isHistoryLoading ? '조회 중...' : '선택 날짜에 저장된 평가가 없습니다.' }}</span>
-        </section>
+        </section> -->
       </form>
 
-      <section class="surface-card evaluation-panel" style="grid-column: span 8">
+      <section class="surface-card evaluation-panel">
         <StateBlock
           v-if="(isLoading || isHistoryLoading) && !feedback"
           type="loading"
@@ -110,7 +110,7 @@ onMounted(loadFeedbackHistory)
               <p class="section-label">Auto Saved</p>
               <h2>AI 평가 기록에 저장됨</h2>
             </div>
-            <RouterLink class="btn btn-secondary" to="/diet/evaluation">평가 기록 보기</RouterLink>
+            <!-- <RouterLink class="btn btn-secondary" to="/diet/evaluation">평가 기록 보기</RouterLink> -->
           </div>
 
           <div class="score-summary">

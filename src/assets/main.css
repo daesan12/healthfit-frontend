@@ -1291,6 +1291,23 @@ a {
   gap: 1rem;
 }
 
+.diet-evaluation-grid {
+  grid-template-columns: minmax(300px, 388px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.diet-evaluation-grid > * {
+  grid-column: auto;
+  min-width: 0;
+}
+
+.evaluation-control-card {
+  width: 100%;
+  height: fit-content;
+  align-content: start;
+  align-self: start;
+}
+
 .score-summary {
   display: grid;
   grid-template-columns: 190px 1fr;

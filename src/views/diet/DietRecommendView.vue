@@ -207,7 +207,7 @@ async function saveSelectedMeals() {
           description: form?.description?.trim() || preference.value,
         })
         savedCount += 1
-        if (form) form.message = '????앸떒?쇰줈 ??ν뻽?듬땲??'
+        if (form) form.message = '저장 식단으로 저장했습니다.'
       }
       saveMessage.value = `${selectedMeals.length}개 AI 자유 추천 식사를 저장 식단으로 저장했습니다.`
     } catch (error) {

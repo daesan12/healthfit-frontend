@@ -46,12 +46,7 @@ const quickLinks = [
     to: '/workout/recommend',
     icon: '💪',
   },
-  {
-    label: 'AI 진행 추천',
-    caption: '다음 운동 목표 확인',
-    to: '/workout/progression',
-    icon: '🎯',
-  },
+  
 ]
 
 function toggle() {

@@ -412,7 +412,7 @@ onMounted(async () => {
         </div>
         <p v-if="formMessage" class="form-message">{{ formMessage }}</p>
         <div class="button-row">
-          <RouterLink class="btn btn-secondary" to="/workout/progression">다음 운동 목표 추천</RouterLink>
+          <!-- <RouterLink class="btn btn-secondary" to="/workout/progression">다음 운동 목표 추천</RouterLink> -->
           <RouterLink class="btn btn-secondary" to="/progress">진행 현황 보기</RouterLink>
           <RouterLink class="btn btn-secondary" to="/workout/routines">운동 루틴 관리</RouterLink>
         </div>

@@ -79,7 +79,7 @@ onMounted(fetchTodayProgress)
     <section class="hero-section home-dashboard-hero">
       <div class="hero-copy">
         <p class="section-label">Premium AI Health Dashboard</p>
-        <h1>오늘의 기록으로 내 몸에 맞는 루틴을 설계하세요</h1>
+        <h1>오늘의 기록으로 내 몸에 맞는</br>루틴을 설계하세요</h1>
         <p class="hero-description">
           식단, 운동, 신체 지표를 한 화면에서 관리하고 AI 추천으로 다음 선택을 더 선명하게 만드는 HealthFit입니다.
         </p>

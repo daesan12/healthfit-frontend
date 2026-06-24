@@ -2,6 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import ToastHost from '@/components/common/ToastHost.vue'
+import HealthFitQuickMenu from '@/components/common/HealthFitQuickMenu.vue'
+import HealthFitAiChatWidget from '@/components/common/HealthFitAiChatWidget.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -61,13 +63,12 @@ async function handleLogout() {
       </nav>
 
       <div class="auth-actions">
-        <RouterLink class="btn-ai nav-ai" to="/ai-chat">AI 상담</RouterLink>
-
         <template v-if="authStore.isAuthenticated">
           <span v-if="isCheckingSession" class="text-link">확인 중...</span>
           <span v-else class="session-name">{{ authStore.user?.username || '로그인됨' }}</span>
           <button class="btn-primary nav-button" type="button" @click="handleLogout">로그아웃</button>
         </template>
+
         <template v-else>
           <RouterLink class="text-link" to="/login">로그인</RouterLink>
           <RouterLink class="btn-primary nav-button" to="/signup">회원가입</RouterLink>
@@ -77,5 +78,7 @@ async function handleLogout() {
 
     <RouterView />
     <ToastHost />
+    <HealthFitQuickMenu />
+    <HealthFitAiChatWidget />
   </div>
 </template>

@@ -82,24 +82,7 @@ const quickLinks = [
         <span class="btn btn-secondary">{{ card.action }}</span>
       </RouterLink>
 
-      <section class="surface-card" style="grid-column: 1 / -1">
-        <div class="section-heading-row">
-          <div>
-            <p class="section-label">Quick Links</p>
-            <h2>빠른 이동</h2>
-          </div>
-        </div>
-        <div class="button-row">
-          <RouterLink
-            v-for="link in quickLinks"
-            :key="link.to"
-            class="btn btn-secondary"
-            :to="link.to"
-          >
-            {{ link.label }}
-          </RouterLink>
-        </div>
-      </section>
+      
     </section>
   </main>
 </template>

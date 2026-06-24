@@ -9,6 +9,7 @@ import {
   deleteWorkoutLog,
   getWorkoutLog,
   getWorkoutLogsPage,
+  getWorkoutRoutinesPage,
   getWorkouts,
   updateWorkoutLog,
 } from '@/api/workout'
@@ -60,6 +61,13 @@ const pendingDeleteId = ref(null)
 const formMessage = ref('')
 const errorMessage = ref('')
 
+const routines = ref([])
+const selectedRoutineId = ref('')
+const routineEntries = ref([])
+const isLoadingRoutines = ref(false)
+const isSavingRoutines = ref(false)
+const routineMessage = ref('')
+
 const selectedExercise = computed(() => exercises.value.find((exercise) => exercise.id === Number(form.exerciseId)))
 const editingExercise = computed(() => exercises.value.find((exercise) => exercise.id === Number(editForm.exerciseId)))
 const isEditing = computed(() => Boolean(editForm.id))
@@ -75,24 +83,100 @@ const resultSummary = computed(() => {
   return `${pagination.count}개 중 ${start}-${end}`
 })
 
+function unwrapApiData(response) {
+  if (response?.data?.success === true && response.data.data !== undefined) return response.data.data
+  if (response?.success === true && response.data !== undefined) return response.data
+  if (response?.data?.results || Array.isArray(response?.data)) return response.data
+  return response
+}
+
+function unwrapPageData(response) {
+  const data = unwrapApiData(response)
+
+  if (Array.isArray(data)) {
+    return {
+      count: data.length,
+      page: 1,
+      page_size: data.length || pagination.pageSize,
+      total_pages: 1,
+      has_next: false,
+      has_previous: false,
+      results: data,
+    }
+  }
+
+  return {
+    count: data?.count ?? 0,
+    page: data?.page ?? 1,
+    page_size: data?.pageSize ?? data?.page_size ?? pagination.pageSize,
+    total_pages: data?.totalPages ?? data?.total_pages ?? 1,
+    has_next: data?.hasNext ?? data?.has_next ?? false,
+    has_previous: data?.hasPrevious ?? data?.has_previous ?? false,
+    results: Array.isArray(data?.results) ? data.results : [],
+  }
+}
+
+function unwrapListData(response) {
+  const data = unwrapApiData(response)
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.results)) return data.results
+  return []
+}
+
 function syncPagination(data) {
-  pagination.page = data.page || 1
-  pagination.pageSize = data.pageSize || pagination.pageSize
-  pagination.count = data.count || 0
-  pagination.totalPages = data.totalPages || 1
-  pagination.hasNext = data.hasNext
-  pagination.hasPrevious = data.hasPrevious
+  pagination.page = data?.page ?? 1
+  pagination.pageSize = data?.pageSize ?? data?.page_size ?? pagination.pageSize
+  pagination.count = data?.count ?? 0
+  pagination.totalPages = data?.totalPages ?? data?.total_pages ?? 1
+  pagination.hasNext = data?.hasNext ?? data?.has_next ?? false
+  pagination.hasPrevious = data?.hasPrevious ?? data?.has_previous ?? false
+}
+
+function getExerciseBodyParts(exercise) {
+  return exercise?.bodyParts ?? exercise?.body_parts ?? []
+}
+
+function getExerciseEquipments(exercise) {
+  return exercise?.equipments ?? []
+}
+
+function getLogWorkoutTime(log) {
+  return log?.workoutTime ?? log?.workout_time ?? 0
+}
+
+function getLogSetCount(log) {
+  return log?.setCount ?? log?.set_count ?? log?.sets?.length ?? 0
+}
+
+function getLogRepetition(log) {
+  return log?.repetition ?? '-'
+}
+
+function getLogWorkoutDate(log) {
+  return log?.workoutDate ?? log?.workout_date ?? ''
+}
+
+function getSetOrder(set, index) {
+  return set?.setOrder ?? set?.set_order ?? index + 1
+}
+
+function getSetWeightKg(set) {
+  return set?.weightKg ?? set?.weight_kg ?? null
+}
+
+function getSetRpe(set) {
+  return set?.rpe ?? null
 }
 
 function normalizeSet(set, index) {
   return {
     id: set.id || `set-${Date.now()}-${index}`,
-    setOrder: set.setOrder ?? index + 1,
-    weightKg: set.weightKg ?? null,
+    setOrder: set.setOrder ?? set.set_order ?? index + 1,
+    weightKg: set.weightKg ?? set.weight_kg ?? null,
     repetition: set.repetition ?? 10,
-    durationSeconds: set.durationSeconds ?? null,
+    durationSeconds: set.durationSeconds ?? set.duration_seconds ?? null,
     rpe: set.rpe ?? null,
-    isWarmup: Boolean(set.isWarmup),
+    isWarmup: Boolean(set.isWarmup ?? set.is_warmup),
   }
 }
 
@@ -120,12 +204,51 @@ function validateSets(sets) {
   return hasInvalidSet ? '각 세트는 반복 수 또는 운동 시간(초)이 필요하고, RPE는 1부터 10 사이여야 합니다.' : ''
 }
 
+function extractExerciseId(routineItem) {
+  const fromObject = routineItem?.exercise?.id
+  if (fromObject !== undefined && fromObject !== null) return Number(fromObject)
+  const directId = routineItem?.exerciseId ?? routineItem?.exercise_id
+  if (directId !== undefined && directId !== null) return Number(directId)
+  const workoutId = routineItem?.workoutId ?? routineItem?.workout_id
+  if (workoutId !== undefined && workoutId !== null) return Number(workoutId)
+  return null
+}
+
+function extractExerciseName(routineItem) {
+  return (
+    routineItem?.exercise?.name ||
+    routineItem?.exerciseName ||
+    routineItem?.exercise_name ||
+    routineItem?.name ||
+    ''
+  )
+}
+
+function buildEntrySetsFromRoutineItem(routineItem) {
+  const setCount = Math.max(1, Number(routineItem.sets) || 1)
+  const repetition = Number(routineItem.reps) || 0
+  const weightKg = Number(routineItem.weight) || 0
+  const restSeconds = Number(routineItem.restSeconds ?? routineItem.rest_seconds) || null
+
+  return Array.from({ length: setCount }, (_, index) => ({
+    setOrder: index + 1,
+    weightKg,
+    repetition,
+    durationSeconds: null,
+    rpe: null,
+    isWarmup: false,
+    restSeconds,
+  }))
+}
+
 async function fetchExercises() {
   isLoading.value = true
   errorMessage.value = ''
 
   try {
-    exercises.value = await getWorkouts(search.value.trim() ? { search: search.value.trim(), page_size: 50 } : { page_size: 50 })
+    const response = await getWorkouts(search.value.trim() ? { search: search.value.trim(), page_size: 50 } : { page_size: 50 })
+    exercises.value = unwrapListData(response)
+
     if (route.query.exerciseId && exercises.value.some((exercise) => exercise.id === Number(route.query.exerciseId))) {
       form.exerciseId = Number(route.query.exerciseId)
     } else if (!exercises.value.some((exercise) => exercise.id === Number(form.exerciseId))) {
@@ -137,8 +260,146 @@ async function fetchExercises() {
     }
   } catch (error) {
     errorMessage.value = normalizeCaughtError(error).message
+    exercises.value = []
   } finally {
     isLoading.value = false
+  }
+}
+
+async function fetchRoutines() {
+  isLoadingRoutines.value = true
+  routineMessage.value = ''
+
+  try {
+    const response = await getWorkoutRoutinesPage({ page_size: 100 })
+    const pageData = unwrapPageData(response)
+    routines.value = pageData.results
+  } catch (error) {
+    routineMessage.value = normalizeCaughtError(error).message
+    routines.value = []
+  } finally {
+    isLoadingRoutines.value = false
+  }
+}
+
+function loadRoutineEntries() {
+  routineMessage.value = ''
+  routineEntries.value = []
+
+  const routineId = Number(selectedRoutineId.value)
+  if (!routineId) {
+    return
+  }
+
+  const routine = routines.value.find((item) => item.id === routineId)
+  const items = Array.isArray(routine?.items) ? routine.items : []
+
+  if (items.length === 0) {
+    routineMessage.value = '선택한 루틴에 등록된 운동이 없습니다.'
+    return
+  }
+
+  routineEntries.value = items
+    .map((routineItem) => {
+      const exerciseId = extractExerciseId(routineItem)
+      if (!exerciseId || Number.isNaN(exerciseId)) return null
+      return {
+        exerciseId,
+        exerciseName: extractExerciseName(routineItem),
+        workoutDate: form.workoutDate,
+        workoutTime: 30,
+        memo: '',
+        sets: buildEntrySetsFromRoutineItem(routineItem),
+      }
+    })
+    .filter((entry) => entry !== null)
+
+  if (routineEntries.value.length === 0) {
+    routineMessage.value = '불러올 수 있는 운동 항목이 없습니다.'
+  }
+}
+
+function addEntrySet(entry) {
+  entry.sets.push({
+    setOrder: entry.sets.length + 1,
+    weightKg: 0,
+    repetition: 0,
+    durationSeconds: null,
+    rpe: null,
+    isWarmup: false,
+    restSeconds: null,
+  })
+}
+
+function removeEntrySet(entry, index) {
+  if (entry.sets.length <= 1) return
+  entry.sets.splice(index, 1)
+  entry.sets.forEach((set, setIndex) => {
+    set.setOrder = setIndex + 1
+  })
+}
+
+function validateEntry(entry) {
+  if (!entry.exerciseId) return '운동을 선택해주세요.'
+  if (!entry.sets || entry.sets.length === 0) return '최소 1개의 세트가 필요합니다.'
+  return validateSets(entry.sets)
+}
+
+async function saveRoutineEntries() {
+  routineMessage.value = ''
+
+  if (routineEntries.value.length === 0) {
+    routineMessage.value = '저장할 운동 기록이 없습니다.'
+    return
+  }
+
+  const routineId = Number(selectedRoutineId.value)
+  if (!routineId) {
+    routineMessage.value = '루틴을 먼저 선택해주세요.'
+    return
+  }
+
+  const invalid = routineEntries.value.find((entry) => validateEntry(entry))
+  if (invalid) {
+    routineMessage.value = validateEntry(invalid)
+    return
+  }
+
+  isSavingRoutines.value = true
+  let successCount = 0
+  const failedNames = []
+
+  try {
+    for (const entry of routineEntries.value) {
+      try {
+        await createWorkoutLog({
+          workoutId: entry.exerciseId,
+          routineId,
+          workoutDate: entry.workoutDate,
+          workoutTime: entry.workoutTime,
+          memo: entry.memo,
+          sets: entry.sets.map(toApiSet),
+        })
+        successCount += 1
+      } catch (error) {
+        failedNames.push(entry.exerciseName || `운동 ID ${entry.exerciseId}`)
+      }
+    }
+
+    if (failedNames.length > 0) {
+      routineMessage.value = `${successCount}건 저장 성공. 일부 항목 저장 실패: ${failedNames.join(', ')}`
+    } else {
+      routineMessage.value = `운동 기록 ${successCount}건이 저장되었습니다.`
+      toastStore.success?.(routineMessage.value)
+    }
+
+    routineEntries.value = []
+    selectedRoutineId.value = ''
+    await fetchLogs(1)
+  } catch (error) {
+    routineMessage.value = normalizeCaughtError(error).message
+  } finally {
+    isSavingRoutines.value = false
   }
 }
 
@@ -146,15 +407,19 @@ async function fetchLogs(page = pagination.page) {
   errorMessage.value = ''
 
   try {
-    const data = await getWorkoutLogsPage({
+    const response = await getWorkoutLogsPage({
       date: form.workoutDate,
       page,
       page_size: pagination.pageSize,
     })
-    logs.value = data.results
-    syncPagination(data)
+    const pageData = unwrapPageData(response)
+
+    logs.value = pageData.results
+    syncPagination(pageData)
   } catch (error) {
     errorMessage.value = normalizeCaughtError(error).message
+    logs.value = []
+    syncPagination({ results: [], page, page_size: pagination.pageSize })
   }
 }
 
@@ -211,14 +476,17 @@ async function startEditLog(logId) {
   loadingLogId.value = logId
 
   try {
-    const log = await getWorkoutLog(logId)
+    const response = await getWorkoutLog(logId)
+    const log = unwrapApiData(response)
+    const logSets = Array.isArray(log?.sets) ? log.sets : []
+
     editForm.id = log.id
-    editForm.workoutDate = log.workoutDate
-    editForm.exerciseId = log.workoutId || log.exerciseId
-    editForm.routineId = log.routineId || null
-    editForm.workoutTime = log.workoutTime
+    editForm.workoutDate = log.workoutDate ?? log.workout_date ?? today
+    editForm.exerciseId = log.workoutId ?? log.workout_id ?? log.exerciseId ?? log.exercise_id ?? log.exercise?.id ?? ''
+    editForm.routineId = log.routineId ?? log.routine_id ?? null
+    editForm.workoutTime = log.workoutTime ?? log.workout_time ?? 0
     editForm.memo = log.memo || ''
-    editForm.sets = (log.sets.length ? log.sets : Array.from({ length: log.setCount || 1 }, (_, index) => ({
+    editForm.sets = (logSets.length ? logSets : Array.from({ length: log.setCount ?? log.set_count ?? 1 }, (_, index) => ({
       setOrder: index + 1,
       repetition: log.repetition || 10,
     }))).map(normalizeSet)
@@ -320,8 +588,11 @@ async function handleDateChange() {
 }
 
 onMounted(async () => {
-  await fetchExercises()
-  await fetchLogs(1)
+  await Promise.allSettled([
+    fetchExercises(),
+    fetchLogs(1),
+    fetchRoutines(),
+  ])
 })
 </script>
 
@@ -348,7 +619,7 @@ onMounted(async () => {
     />
 
     <section v-else class="content-grid">
-      <form class="form-card mobile-friendly-form" style="grid-column: span 5" @submit.prevent="saveLog">
+      <form class="form-card mobile-friendly-form workout-log-form" @submit.prevent="saveLog">
         <div class="field-group">
           <label for="workout-date">운동 날짜</label>
           <input id="workout-date" v-model="form.workoutDate" type="date" @change="handleDateChange" />
@@ -401,7 +672,7 @@ onMounted(async () => {
         <div v-if="selectedExercise" class="nutrition-preview">
           <span>선택한 운동</span>
           <strong>{{ selectedExercise.name }}</strong>
-          <p>{{ selectedExercise.bodyParts.join(', ') }} · {{ selectedExercise.equipments.join(', ') || '장비 없음' }}</p>
+          <p>{{ getExerciseBodyParts(selectedExercise).join(', ') }} · {{ getExerciseEquipments(selectedExercise).join(', ') || '장비 없음' }}</p>
         </div>
 
         <div class="button-row form-actions">
@@ -412,13 +683,108 @@ onMounted(async () => {
         </div>
         <p v-if="formMessage" class="form-message">{{ formMessage }}</p>
         <div class="button-row">
-          <RouterLink class="btn btn-secondary" to="/workout/progression">다음 운동 목표 추천</RouterLink>
+          <!-- <RouterLink class="btn btn-secondary" to="/workout/progression">다음 운동 목표 추천</RouterLink> -->
           <RouterLink class="btn btn-secondary" to="/progress">진행 현황 보기</RouterLink>
           <RouterLink class="btn btn-secondary" to="/workout/routines">운동 루틴 관리</RouterLink>
         </div>
       </form>
 
-      <section class="surface-card" style="grid-column: span 7">
+      <section class="surface-card routine-import-card workout-routine-import">
+        <div class="section-heading-row">
+          <div>
+            <p class="section-label">Routine</p>
+            <h2>내 루틴 불러오기</h2>
+          </div>
+          <span class="chip">{{ routines.length }}개 루틴</span>
+        </div>
+
+        <div class="field-group">
+          <label for="routine-select">저장된 루틴</label>
+          <div class="inline-controls mobile-stack">
+            <select id="routine-select" v-model="selectedRoutineId" :disabled="isLoadingRoutines">
+              <option value="">루틴 선택</option>
+              <option v-for="routine in routines" :key="routine.id" :value="routine.id">{{ routine.name }}</option>
+            </select>
+            <button class="btn btn-secondary" type="button" :disabled="!selectedRoutineId || isLoadingRoutines" @click="loadRoutineEntries">
+              {{ isLoadingRoutines ? '불러오는 중...' : '불러오기' }}
+            </button>
+          </div>
+        </div>
+
+        <p v-if="routineMessage && routineEntries.length === 0" class="form-message">{{ routineMessage }}</p>
+
+        <template v-if="routineEntries.length > 0">
+          <div class="routine-list">
+            <article v-for="(entry, entryIndex) in routineEntries" :key="`${entry.exerciseId}-${entryIndex}`" class="routine-item routine-item-manage">
+              <div class="routine-entry-head">
+                <strong>{{ entry.exerciseName || `운동 ID ${entry.exerciseId}` }}</strong>
+                <span class="meta-text">{{ entry.sets.length }}세트</span>
+              </div>
+
+              <div class="content-grid compact-form-grid">
+                <div class="field-group" style="grid-column: span 4">
+                  <label :for="`entry-date-${entryIndex}`">운동 날짜</label>
+                  <input :id="`entry-date-${entryIndex}`" v-model="entry.workoutDate" type="date" />
+                </div>
+                <div class="field-group" style="grid-column: span 4">
+                  <label :for="`entry-time-${entryIndex}`">시간(분)</label>
+                  <input :id="`entry-time-${entryIndex}`" v-model.number="entry.workoutTime" type="number" min="0" />
+                </div>
+                <div class="field-group" style="grid-column: span 4">
+                  <label :for="`entry-memo-${entryIndex}`">메모</label>
+                  <input :id="`entry-memo-${entryIndex}`" v-model="entry.memo" type="text" placeholder="선택" />
+                </div>
+              </div>
+
+              <div class="section-heading-row">
+                <p class="section-label">세트</p>
+                <button class="btn btn-secondary" type="button" @click="addEntrySet(entry)">세트 추가</button>
+              </div>
+
+              <div class="routine-set-list">
+                <article v-for="(set, setIndex) in entry.sets" :key="setIndex" class="routine-set-row">
+                  <span class="set-badge">{{ setIndex + 1 }}</span>
+                  <div class="content-grid compact-form-grid">
+                    <div class="field-group" style="grid-column: span 3">
+                      <label :for="`entry-${entryIndex}-weight-${setIndex}`">중량</label>
+                      <input :id="`entry-${entryIndex}-weight-${setIndex}`" v-model.number="set.weightKg" type="number" min="0" step="0.5" placeholder="맨몸" />
+                    </div>
+                    <div class="field-group" style="grid-column: span 3">
+                      <label :for="`entry-${entryIndex}-reps-${setIndex}`">반복</label>
+                      <input :id="`entry-${entryIndex}-reps-${setIndex}`" v-model.number="set.repetition" type="number" min="1" placeholder="선택" />
+                    </div>
+                    <div class="field-group" style="grid-column: span 3">
+                      <label :for="`entry-${entryIndex}-duration-${setIndex}`">시간(초)</label>
+                      <input :id="`entry-${entryIndex}-duration-${setIndex}`" v-model.number="set.durationSeconds" type="number" min="1" placeholder="선택" />
+                    </div>
+                    <div class="field-group" style="grid-column: span 3">
+                      <label :for="`entry-${entryIndex}-rpe-${setIndex}`">RPE</label>
+                      <input :id="`entry-${entryIndex}-rpe-${setIndex}`" v-model.number="set.rpe" type="number" min="1" max="10" step="0.5" placeholder="선택" />
+                    </div>
+                    <label class="checkbox-row" style="grid-column: span 12">
+                      <input v-model="set.isWarmup" type="checkbox" />
+                      워밍업 세트
+                    </label>
+                  </div>
+                  <button class="btn btn-secondary" type="button" :disabled="entry.sets.length <= 1" @click="removeEntrySet(entry, setIndex)">삭제</button>
+                </article>
+              </div>
+            </article>
+          </div>
+
+          <div class="button-row form-actions">
+            <button class="btn btn-primary" type="button" :disabled="isSavingRoutines" @click="saveRoutineEntries">
+              {{ isSavingRoutines ? '저장 중...' : `전체 저장 (${routineEntries.length}건)` }}
+            </button>
+            <button class="btn btn-secondary" type="button" :disabled="isSavingRoutines" @click="routineEntries = []; selectedRoutineId = ''; routineMessage = ''">
+              취소
+            </button>
+          </div>
+          <p v-if="routineMessage" class="form-message">{{ routineMessage }}</p>
+        </template>
+      </section>
+
+      <section class="surface-card workout-log-list-card">
         <div class="section-heading-row">
           <div>
             <p class="section-label">Logs</p>
@@ -453,7 +819,7 @@ onMounted(async () => {
               <option value="">선택</option>
               <option v-for="exercise in exercises" :key="exercise.id" :value="exercise.id">{{ exercise.name }}</option>
             </select>
-            <span v-if="editingExercise" class="meta-text">{{ editingExercise.bodyParts.join(', ') }}</span>
+            <span v-if="editingExercise" class="meta-text">{{ getExerciseBodyParts(editingExercise).join(', ') }}</span>
           </div>
 
           <div class="field-group">
@@ -507,14 +873,14 @@ onMounted(async () => {
           <article v-for="log in logs" :key="log.id" class="meal-item">
             <div>
               <strong>{{ log.exercise?.name || '운동' }}</strong>
-              <span>{{ log.workoutTime }}분 · {{ log.setCount }}세트 · {{ log.repetition || '-' }}회</span>
+              <span>{{ getLogWorkoutTime(log) }}분 · {{ getLogSetCount(log) }}세트 · {{ getLogRepetition(log) }}회</span>
               <span v-if="log.sets?.length">
-                {{ log.sets.map((set) => `${set.setOrder}세트 ${set.weightKg ?? '맨몸'}kg ${set.repetition ?? '-'}회${set.rpe ? ` RPE ${set.rpe}` : ''}`).join(' · ') }}
+                {{ log.sets.map((set, index) => `${getSetOrder(set, index)}세트 ${getSetWeightKg(set) ?? '맨몸'}kg ${set.repetition ?? '-'}회${getSetRpe(set) ? ` RPE ${getSetRpe(set)}` : ''}`).join(' · ') }}
               </span>
               <span v-if="log.memo">{{ log.memo }}</span>
             </div>
             <div class="delete-actions">
-              <strong>{{ log.workoutDate }}</strong>
+              <strong>{{ getLogWorkoutDate(log) }}</strong>
               <button type="button" :disabled="loadingLogId === log.id" @click="startEditLog(log.id)">
                 {{ loadingLogId === log.id ? '조회 중...' : '상세 수정' }}
               </button>
@@ -554,3 +920,189 @@ onMounted(async () => {
     </section>
   </main>
 </template>
+
+<style scoped>
+.workout-log-form {
+  grid-column: span 5;
+  align-self: start;
+}
+
+.workout-routine-import {
+  grid-column: span 7;
+  align-self: start;
+
+  /* 카드 자체가 너무 길어지지 않게 제한 */
+  max-height: calc(100vh - 190px);
+  overflow: hidden;
+}
+
+.workout-log-list-card {
+  grid-column: span 12;
+}
+
+.routine-import-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* 루틴 선택 영역은 고정 */
+.routine-import-card > .section-heading-row,
+.routine-import-card > .field-group {
+  flex-shrink: 0;
+}
+
+/* 루틴 운동 목록만 내부 스크롤 */
+.routine-import-card > .routine-list {
+  flex: 1;
+  min-height: 0;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* 스크롤바 너무 못생기지 않게 */
+.routine-import-card > .routine-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.routine-import-card > .routine-list::-webkit-scrollbar-thumb {
+  background: rgba(31, 107, 63, 0.28);
+  border-radius: 999px;
+}
+
+.routine-import-card > .routine-list::-webkit-scrollbar-track {
+  background: rgba(31, 107, 63, 0.06);
+  border-radius: 999px;
+}
+
+/* 저장/취소 버튼은 카드 아래쪽에 유지 */
+.routine-import-card .form-actions {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding-top: 0.75rem;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.2),
+    rgba(255, 255, 255, 0.95)
+  );
+}
+
+.routine-import-card .inline-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.routine-import-card .inline-controls select {
+  flex: 1;
+  min-width: 0;
+}
+
+.routine-entry-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.routine-entry-head strong {
+  font-size: 1.05rem;
+  word-break: keep-all;
+}
+
+.routine-import-card .routine-item-manage {
+  display: block;
+  padding: 1.25rem;
+}
+
+.routine-set-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.routine-set-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: start;
+  padding: 1rem;
+  border: 1px solid rgba(34, 93, 62, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.set-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1f6b3f;
+  color: white;
+  font-weight: 800;
+}
+
+.routine-set-row .compact-form-grid {
+  width: 100%;
+}
+
+.routine-set-row .field-group {
+  min-width: 0;
+}
+
+.routine-set-row input {
+  width: 100%;
+}
+
+.routine-set-row .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.routine-set-row > .btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .workout-log-form,
+  .workout-routine-import,
+  .workout-log-list-card {
+    grid-column: span 12;
+  }
+
+  .workout-routine-import {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .routine-import-card > .routine-list {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 900px) {
+  .routine-set-row {
+    grid-template-columns: 1fr;
+  }
+
+  .set-badge {
+    width: 100%;
+  }
+
+  .routine-entry-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+</style>

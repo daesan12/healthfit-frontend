@@ -70,6 +70,11 @@ export async function getWorkoutRoutines(params) {
   return results.map(mapWorkoutRoutine)
 }
 
+export async function getWorkoutRoutine(routineId) {
+  const response = await apiClient.get(`/workout-routines/${routineId}/`)
+  return mapWorkoutRoutine(unwrapResponse(response))
+}
+
 export async function getWorkoutRoutinesPage(params) {
   const response = await apiClient.get('/workout-routines/', { params })
   return mapPaginatedData(unwrapResponse(response), mapWorkoutRoutine)

@@ -283,6 +283,7 @@ onMounted(() => {
           <div class="button-row">
             <button class="btn btn-primary" type="submit">{{ editingRoutineId ? '루틴 수정' : '루틴 만들기' }}</button>
             <button v-if="editingRoutineId" class="btn btn-secondary" type="button" @click="resetRoutineForm">취소</button>
+            <RouterLink class="btn btn-secondary" to="/workout/recommend">AI 루틴 추천</RouterLink>
           </div>
         </form>
 

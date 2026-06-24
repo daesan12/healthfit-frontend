@@ -318,6 +318,7 @@ onMounted(() => {
         <div class="button-row">
           <button class="btn btn-primary" type="submit">{{ editingSavedMealId ? '저장 식단 수정' : '저장 식단 만들기' }}</button>
           <button v-if="editingSavedMealId" class="btn btn-secondary" type="button" @click="resetForm">취소</button>
+          <RouterLink class="btn btn-secondary" to="/diet/recommend">AI 식단 추천</RouterLink>
         </div>
         <p v-if="message" class="form-message">{{ message }}</p>
       </form>

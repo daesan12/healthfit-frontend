@@ -236,7 +236,7 @@ onMounted(fetchProgress)
           title="기간 내 식단 또는 운동 기록이 없습니다"
           message="식단 기록이나 운동 기록을 추가하면 이곳에 일별 요약이 표시됩니다."
         >
-          <RouterLink class="btn btn-primary" to="/diet/records">식단 기록하기</RouterLink>
+          <RouterLink class="btn btn-primary" to="/diet/records">식사 기록하기</RouterLink>
           <RouterLink class="btn btn-secondary" to="/workout/logs">운동 기록하기</RouterLink>
         </StateBlock>
       </article>
@@ -317,7 +317,7 @@ onMounted(fetchProgress)
           title="일별 요약 데이터가 없습니다"
           message="식단이나 운동 기록을 남기면 날짜별 요약이 표시됩니다."
         >
-          <RouterLink class="btn btn-primary" to="/diet/records">식단 기록하기</RouterLink>
+          <RouterLink class="btn btn-primary" to="/diet/records">식사 기록하기</RouterLink>
           <RouterLink class="btn btn-secondary" to="/workout/logs">운동 기록하기</RouterLink>
         </StateBlock>
       </section>

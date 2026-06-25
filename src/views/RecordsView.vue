@@ -5,7 +5,7 @@ const recordCards = [
     eyebrow: 'Meal',
     description: '섭취량을 기록하고 대시보드에서 영양 합계를 확인합니다.',
     to: '/diet/records',
-    action: '식단 기록하기',
+    action: '식사 기록하기',
   },
   {
     title: '저장 식단',

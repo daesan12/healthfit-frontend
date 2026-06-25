@@ -200,7 +200,7 @@ onMounted(() => {
         message="다른 음식명이나 카테고리로 다시 검색해보세요."
       >
         <button class="btn btn-secondary" type="button" @click="resetFilters">검색 초기화</button>
-        <RouterLink class="btn btn-primary" to="/diet/records">식단 기록하기</RouterLink>
+        <RouterLink class="btn btn-primary" to="/diet/records">식사 기록하기</RouterLink>
       </StateBlock>
     </section>
   </main>

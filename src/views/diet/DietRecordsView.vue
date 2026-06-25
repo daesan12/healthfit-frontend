@@ -503,7 +503,7 @@ onMounted(async () => {
         </div>
 
         <button class="btn btn-primary" type="submit" :disabled="isSaving">
-          {{ isSaving ? '저장 중...' : '식단 기록 저장' }}
+          {{ isSaving ? '저장 중...' : '식사 기록 저장' }}
         </button>
         <p v-if="formMessage" class="form-message">{{ formMessage }}</p>
         <div class="button-row">

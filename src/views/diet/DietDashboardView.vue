@@ -548,7 +548,7 @@ onMounted(async () => {
         </div>
 
         <div class="selected-day-actions">
-          <RouterLink class="btn btn-primary" to="/diet/records">식단 기록하기</RouterLink>
+          <RouterLink class="btn btn-primary" to="/diet/records">식사 기록하기</RouterLink>
           <RouterLink class="btn btn-secondary" to="/workout/logs">운동 기록하기</RouterLink>
         </div>
       </aside>
